@@ -1,6 +1,279 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
-             android:layout_width="match_parent"
-             android:layout_height="match_parent">
+<!--
+    SCAN SCREEN
+    Colours  : background=#0D0D0D  surface=#1E1E1E  accent=#EBFF57  white=#FFFFFF
+    Font     : Inter  (48sp logo / 14sp speaking title / 10sp body+nav)
+    Replace  : @drawable/ic_placeholder_* with your actual icon drawables
+    Camera   : Replace the FrameLayout with id=cameraPreviewContainer with
+               a androidx.camera.view.PreviewView once CameraX is integrated.
+-->
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background"
+    android:fitsSystemWindows="true">
+
+    <!-- ══ TOP BAR ══ -->
+    <RelativeLayout
+        android:id="@+id/topBar"
+        android:layout_width="0dp"
+        android:layout_height="@dimen/topbar_height"
+        android:paddingHorizontal="@dimen/screen_padding_h"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <TextView
+            android:id="@+id/tvLogo"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_centerVertical="true"
+            android:layout_alignParentStart="true"
+            android:text="@string/app_name"
+            android:textStyle="bold"
+            android:textSize="48sp"
+            android:fontFamily="@font/inter_bold"
+            android:textColor="@color/accent" />
+
+        <ImageView
+            android:id="@+id/btnMenu"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_centerVertical="true"
+            android:layout_alignParentEnd="true"
+            android:background="@drawable/bg_menu_btn"
+            android:padding="10dp"
+            android:src="@drawable/ic_menu"
+            android:contentDescription="Menu"
+            android:scaleType="fitCenter" />
+        <!--
+            REPLACE: @drawable/ic_placeholder_menu
+            WITH   : @drawable/ic_menu
+        -->
+    </RelativeLayout>
+
+    <!-- ══ SPEAKING NOW CARD ══ -->
+    <LinearLayout
+        android:id="@+id/cardSpeaking"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="@dimen/screen_padding_h"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/bg_speaking_card"
+        android:orientation="horizontal"
+        android:padding="14dp"
+        android:gravity="center_vertical"
+        app:layout_constraintTop_toBottomOf="@id/topBar"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <!-- Speaker icon -->
+        <ImageView
+            android:id="@+id/ivSpeakerIcon"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_marginEnd="14dp"
+            android:src="@drawable/ic_speaker"
+            android:contentDescription="Speaking"
+            android:scaleType="fitCenter"
+            app:tint="#FFEBFF57" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvSpeakingTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/speaking_now"
+                android:textSize="14sp"
+                android:fontFamily="@font/inter_semibold"
+                android:textColor="@color/accent"
+                android:layout_marginBottom="3dp" />
+
+            <TextView
+                android:id="@+id/tvSpeakingInstruction"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/speaking_instruction"
+                android:textSize="10sp"
+                android:fontFamily="@font/inter_regular"
+                android:textColor="@color/white"
+                android:lineSpacingMultiplier="1.3" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- ══ CAMERA VIEWFINDER ══ -->
+    <!--
+        Replace this FrameLayout with:
+            <androidx.camera.view.PreviewView
+                android:id="@+id/cameraPreview"
+                ... />
+        once CameraX dependency is added.
+    -->
+    <FrameLayout
+        android:id="@+id/cameraPreviewContainer"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginHorizontal="@dimen/screen_padding_h"
+        android:layout_marginTop="16dp"
+        android:background="@color/camera_bg"
+        app:layout_constraintTop_toBottomOf="@id/cardSpeaking"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/shutterRow"
+        app:layout_constraintVertical_chainStyle="spread">
+
+        <!--
+            Scan frame corners overlay — drawn via custom ScanFrameView.
+            See ui/scan/ScanFrameView.kt which draws the four yellow corner brackets.
+        -->
+        <view
+            class="com.miji.assistive_math.ui.ScanFrameView"
+            android:id="@+id/scanFrame"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+    </FrameLayout>
+
+    <!-- ══ SHUTTER ROW (Flash · Shutter · Upload) ══ -->
+    <LinearLayout
+        android:id="@+id/shutterRow"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="@dimen/screen_padding_h"
+        android:layout_marginTop="16dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        app:layout_constraintTop_toBottomOf="@id/cameraPreviewContainer"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/tvAutoCaptureLabel">
+
+        <!-- Flash button -->
+        <LinearLayout
+            android:id="@+id/btnFlash"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:clickable="true"
+            android:focusable="true">
+
+            <FrameLayout
+                android:layout_width="52dp"
+                android:layout_height="52dp"
+                android:background="@drawable/bg_scan_action_btn">
+
+                <ImageView
+                    android:id="@+id/ivFlash"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_flash"
+                    android:contentDescription="Flash"
+                    android:scaleType="fitCenter"
+                    app:tint="#FFFFFFFF" />
+                <!--
+                    REPLACE: @drawable/ic_placeholder_flash
+                    WITH   : @drawable/ic_flash  (lightning bolt, white)
+                -->
+            </FrameLayout>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="@string/flash"
+                android:textSize="10sp"
+                android:fontFamily="@font/inter_regular"
+                android:textColor="@color/white" />
+        </LinearLayout>
+
+        <!-- Shutter button (large accent circle) -->
+        <FrameLayout
+            android:id="@+id/btnShutter"
+            android:layout_width="72dp"
+            android:layout_height="72dp"
+            android:layout_marginBottom="16dp"
+            android:background="@drawable/bg_shutter"
+            android:clickable="true"
+            android:focusable="true">
+            <!-- No icon needed — solid accent circle is the shutter -->
+        </FrameLayout>
+
+        <!-- Upload button -->
+        <LinearLayout
+            android:id="@+id/btnUpload"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:clickable="true"
+            android:focusable="true">
+
+            <FrameLayout
+                android:layout_width="52dp"
+                android:layout_height="52dp"
+                android:background="@drawable/bg_scan_action_btn">
+
+                <ImageView
+                    android:id="@+id/ivUpload"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_upload"
+                    android:contentDescription="Upload"
+                    android:scaleType="fitCenter"
+                    app:tint="#FFFFFFFF" />
+                <!--
+                    REPLACE: @drawable/ic_placeholder_upload
+                    WITH   : @drawable/ic_upload  (arrow-up-from-box, white)
+                -->
+            </FrameLayout>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="@string/upload"
+                android:textSize="10sp"
+                android:fontFamily="@font/inter_regular"
+                android:textColor="@color/white" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- ══ AUTO-CAPTURE LABEL ══ -->
+    <TextView
+        android:id="@+id/tvAutoCaptureLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:layout_marginBottom="8dp"
+        android:text="@string/auto_capture_ready"
+        android:textSize="10sp"
+        android:fontFamily="@font/inter_medium"
+        android:textColor="@color/white"
+        android:letterSpacing="0.12"
+        app:layout_constraintTop_toBottomOf="@id/shutterRow"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/bottomNavScan" />
+
+    <!-- ══ BOTTOM NAV ══ -->
+    <include
+        android:id="@+id/bottomNavScan"
+        layout="@layout/bottom_nav"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/nav_height"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

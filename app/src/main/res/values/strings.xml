@@ -1,3 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">miji-assistive-math</string>
+    <string name="app_name">MIJI</string>
+
+    <!-- Home Screen -->
+    <string name="scan_equation">Scan Equation</string>
+    <string name="scan_subtitle">Auto-detects. Reads aloud. Solves.</string>
+    <string name="scan_tap_hint">Tap to start.</string>
+    <string name="self_learning_modules">Self-Learning Modules</string>
+    <string name="module_addition">Addition</string>
+    <string name="module_subtraction">Subtraction</string>
+    <string name="module_multiplication">Multiplication</string>
+    <string name="module_division">Division</string>
+    <string name="module_mixed">Mixed</string>
+
+    <!-- Scan Screen -->
+    <string name="speaking_now">Speaking Now</string>
+    <string name="speaking_instruction">Move camera a little bit to the right. A little bit higher.\nHold still. Capturing equation…</string>
+    <string name="auto_capture_ready">AUTO-CAPTURE READY</string>
+    <string name="flash">Flash</string>
+    <string name="upload">Upload</string>
+
+    <!-- Profile Screen -->
+    <string name="your_name">Your Name</string>
+    <string name="username">username</string>
+    <string name="settings">Settings</string>
+    <string name="setting_1">Setting 1</string>
+    <string name="setting_2">Setting 2</string>
+    <string name="logout">Logout</string>
+    <string name="delete_account">Delete Account</string>
+
+    <!-- Nav -->
+    <string name="nav_home">Home</string>
+    <string name="nav_scan">Scan</string>
+    <string name="nav_profile">Profile</string>
 </resources>

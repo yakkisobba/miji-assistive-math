@@ -1,6 +1,202 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!--
+    HOME SCREEN
+    Colours  : background=#0D0D0D  surface=#1E1E1E  accent=#EBFF57  white=#FFFFFF
+    Font     : Inter  (48sp logo / 14sp titles+modules / 10sp subtitles+nav)
+    Replace  : @drawable/ic_placeholder_* with your actual icon drawables
+-->
+<androidx.coordinatorlayout.widget.CoordinatorLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="@color/background"
+    android:fitsSystemWindows="true">
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+    <!-- ── SCROLLABLE CONTENT ── -->
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/scrollContent"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clipToPadding="false"
+        android:paddingBottom="80dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingHorizontal="@dimen/screen_padding_h"
+            android:paddingTop="16dp">
+
+            <!-- ══ TOP BAR ══ -->
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/topbar_height"
+                android:layout_marginBottom="16dp">
+
+                <!-- MIJI logo -->
+                <TextView
+                    android:id="@+id/tvLogo"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_centerVertical="true"
+                    android:layout_alignParentStart="true"
+                    android:text="@string/app_name"
+                    android:textStyle="bold"
+                    android:textSize="48sp"
+                    android:fontFamily="@font/inter_bold"
+                    android:textColor="@color/accent" />
+
+                <!-- Hamburger menu button -->
+                <ImageView
+                    android:id="@+id/btnMenu"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:layout_centerVertical="true"
+                    android:layout_alignParentEnd="true"
+                    android:background="@drawable/bg_menu_btn"
+                    android:padding="10dp"
+                    android:src="@drawable/ic_menu"
+                    android:contentDescription="Menu"
+                    android:scaleType="fitCenter" />
+                <!--
+                    REPLACE: android:src="@drawable/ic_placeholder_menu"
+                    WITH   : android:src="@drawable/ic_menu"
+                    Your hamburger / three-line icon goes here (white, 24×24dp)
+                -->
+            </RelativeLayout>
+
+            <!-- ══ SCAN EQUATION CARD ══ -->
+            <LinearLayout
+                android:id="@+id/cardScanEquation"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="24dp"
+                android:background="@drawable/bg_card_surface"
+                android:orientation="horizontal"
+                android:padding="16dp"
+                android:gravity="center_vertical"
+                android:clickable="true"
+                android:focusable="true">
+
+                <!-- Camera circle icon -->
+                <FrameLayout
+                    android:layout_width="56dp"
+                    android:layout_height="56dp"
+                    android:background="@drawable/bg_scan_icon_circle"
+                    android:layout_marginEnd="16dp">
+
+                    <ImageView
+                        android:id="@+id/ivScanIcon"
+                        android:layout_width="28dp"
+                        android:layout_height="28dp"
+                        android:layout_gravity="center"
+                        android:src="@drawable/ic_camera"
+                        android:contentDescription="Camera"
+                        android:scaleType="fitCenter"
+                        app:tint="#FF0D0D0D" />
+                    <!--
+                        REPLACE: android:src="@drawable/ic_placeholder_camera"
+                        WITH   : android:src="@drawable/ic_camera"
+                        Black camera icon (tinted to #0D0D0D so it shows on yellow)
+                    -->
+                </FrameLayout>
+
+                <!-- Text block -->
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/tvScanTitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/scan_equation"
+                        android:textSize="14sp"
+                        android:fontFamily="@font/inter_semibold"
+                        android:textColor="@color/accent"
+                        android:layout_marginBottom="2dp" />
+
+                    <TextView
+                        android:id="@+id/tvScanSubtitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/scan_subtitle"
+                        android:textSize="10sp"
+                        android:fontFamily="@font/inter_regular"
+                        android:textColor="@color/white"
+                        android:layout_marginBottom="6dp" />
+
+                    <TextView
+                        android:id="@+id/tvScanHint"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/scan_tap_hint"
+                        android:textSize="10sp"
+                        android:fontFamily="@font/inter_regular"
+                        android:textColor="@color/white"
+                        android:alpha="0.55" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- ══ SECTION HEADER ══ -->
+            <TextView
+                android:id="@+id/tvSectionHeader"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                android:text="@string/self_learning_modules"
+                android:textSize="14sp"
+                android:fontFamily="@font/inter_semibold"
+                android:textColor="@color/white" />
+
+            <!-- ══ MODULE LIST ══ -->
+            <!-- Addition -->
+            <include layout="@layout/item_module"
+                android:id="@+id/moduleAddition"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="10dp" />
+
+            <!-- Subtraction -->
+            <include layout="@layout/item_module"
+                android:id="@+id/moduleSubtraction"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="10dp" />
+
+            <!-- Multiplication -->
+            <include layout="@layout/item_module"
+                android:id="@+id/moduleMultiplication"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="10dp" />
+
+            <!-- Division -->
+            <include layout="@layout/item_module"
+                android:id="@+id/moduleDivision"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="10dp" />
+
+            <!-- Mixed -->
+            <include layout="@layout/item_module"
+                android:id="@+id/moduleMixed"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="10dp" />
+
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+
+    <!-- ══ BOTTOM NAV (pinned) ══ -->
+    <include
+        layout="@layout/bottom_nav"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/nav_height"
+        android:layout_gravity="bottom"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior" />
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

@@ -1,6 +1,264 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!--
+    PROFILE SCREEN
+    Colours  : background=#0D0D0D  surface=#1E1E1E  accent=#EBFF57
+               white=#FFFFFF  danger=#E05C5C
+    Font     : Inter  (48sp logo / 14sp name+settings+buttons / 10sp username+nav)
+    Replace  : @drawable/ic_placeholder_* with your actual icon drawables
+-->
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="@color/background"
+    android:fitsSystemWindows="true">
+
+    <!-- ══ TOP BAR ══ -->
+    <RelativeLayout
+        android:id="@+id/topBar"
+        android:layout_width="0dp"
+        android:layout_height="@dimen/topbar_height"
+        android:paddingHorizontal="@dimen/screen_padding_h"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <TextView
+            android:id="@+id/tvLogo"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_centerVertical="true"
+            android:layout_alignParentStart="true"
+            android:text="@string/app_name"
+            android:textStyle="bold"
+            android:textSize="48sp"
+            android:fontFamily="@font/inter_bold"
+            android:textColor="@color/accent" />
+
+        <ImageView
+            android:id="@+id/btnMenu"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_centerVertical="true"
+            android:layout_alignParentEnd="true"
+            android:background="@drawable/bg_menu_btn"
+            android:padding="10dp"
+            android:src="@drawable/ic_menu"
+            android:contentDescription="Menu"
+            android:scaleType="fitCenter" />
+        <!--
+            REPLACE: @drawable/ic_placeholder_menu
+            WITH   : @drawable/ic_menu
+        -->
+    </RelativeLayout>
+
+    <!-- ══ PROFILE CARD (avatar + name + username) ══ -->
+    <LinearLayout
+        android:id="@+id/cardProfile"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="@dimen/screen_padding_h"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/bg_card_surface"
+        android:orientation="horizontal"
+        android:padding="14dp"
+        android:gravity="center_vertical"
+        app:layout_constraintTop_toBottomOf="@id/topBar"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <!-- Avatar circle -->
+        <FrameLayout
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="@drawable/bg_avatar"
+            android:layout_marginEnd="14dp">
+
+            <ImageView
+                android:id="@+id/ivAvatar"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_user"
+                android:contentDescription="Avatar"
+                android:scaleType="fitCenter"
+                app:tint="#FFFFFFFF" />
+            <!--
+                REPLACE: @drawable/ic_placeholder_person
+                WITH   : @drawable/ic_person  (white person/silhouette icon)
+                Or load a real profile photo using Glide/Coil:
+                    Glide.with(this).load(userPhotoUrl).circleCrop().into(ivAvatar)
+            -->
+        </FrameLayout>
+
+        <!-- Name + username -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvUserName"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/your_name"
+                android:textSize="14sp"
+                android:fontFamily="@font/inter_semibold"
+                android:textColor="@color/white"
+                android:layout_marginBottom="2dp" />
+
+            <TextView
+                android:id="@+id/tvUserHandle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/username"
+                android:textSize="10sp"
+                android:fontFamily="@font/inter_regular"
+                android:textColor="@color/white"
+                android:alpha="0.55" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- ══ SETTINGS SECTION ══ -->
+    <LinearLayout
+        android:id="@+id/settingsSection"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="@dimen/screen_padding_h"
+        android:layout_marginTop="24dp"
+        android:orientation="vertical"
+        app:layout_constraintTop_toBottomOf="@id/cardProfile"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <!-- "Settings" header -->
+        <TextView
+            android:id="@+id/tvSettingsHeader"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="10dp"
+            android:text="@string/settings"
+            android:textSize="14sp"
+            android:fontFamily="@font/inter_semibold"
+            android:textColor="@color/white" />
+
+        <!-- Settings card -->
+        <LinearLayout
+            android:id="@+id/cardSettings"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_card_surface"
+            android:orientation="vertical"
+            android:paddingHorizontal="16dp">
+
+            <!-- Setting 1 row (with toggle) -->
+            <RelativeLayout
+                android:id="@+id/rowSetting1"
+                android:layout_width="match_parent"
+                android:layout_height="52dp">
+
+                <TextView
+                    android:id="@+id/tvSetting1"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_centerVertical="true"
+                    android:layout_alignParentStart="true"
+                    android:text="@string/setting_1"
+                    android:textSize="14sp"
+                    android:fontFamily="@font/inter_regular"
+                    android:textColor="@color/white" />
+
+                <!-- Toggle switch -->
+                <androidx.appcompat.widget.SwitchCompat
+                    android:id="@+id/toggleSetting1"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_centerVertical="true"
+                    android:layout_alignParentEnd="true"
+                    android:checked="true"
+                    app:thumbTint="@color/background"
+                    app:trackTint="@color/accent" />
+                <!--
+                    When checked=true  → trackTint=#EBFF57, thumbTint=#0D0D0D
+                    When checked=false → trackTint=#3A3A3A, thumbTint=#FFFFFF
+                    Handle in ProfileActivity via toggleSetting1.setOnCheckedChangeListener{}
+                -->
+            </RelativeLayout>
+
+            <!-- Divider -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="@color/divider" />
+
+            <!-- Setting 2 row (no toggle visible in design — add as needed) -->
+            <RelativeLayout
+                android:id="@+id/rowSetting2"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:clickable="true"
+                android:focusable="true">
+
+                <TextView
+                    android:id="@+id/tvSetting2"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_centerVertical="true"
+                    android:layout_alignParentStart="true"
+                    android:text="@string/setting_2"
+                    android:textSize="14sp"
+                    android:fontFamily="@font/inter_regular"
+                    android:textColor="@color/white" />
+            </RelativeLayout>
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- ══ LOGOUT BUTTON ══ -->
+    <Button
+        android:id="@+id/btnLogout"
+        android:layout_width="0dp"
+        android:layout_height="52dp"
+        android:layout_marginHorizontal="@dimen/screen_padding_h"
+        android:layout_marginTop="20dp"
+        android:background="@drawable/bg_btn_logout"
+        android:text="@string/logout"
+        android:textSize="14sp"
+        android:fontFamily="@font/inter_semibold"
+        android:textColor="@color/background"
+        android:stateListAnimator="@null"
+        android:elevation="0dp"
+        app:layout_constraintTop_toBottomOf="@id/settingsSection"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- ══ DELETE ACCOUNT BUTTON ══ -->
+    <Button
+        android:id="@+id/btnDeleteAccount"
+        android:layout_width="0dp"
+        android:layout_height="52dp"
+        android:layout_marginHorizontal="@dimen/screen_padding_h"
+        android:layout_marginTop="12dp"
+        android:background="@drawable/bg_btn_delete"
+        android:text="@string/delete_account"
+        android:textSize="14sp"
+        android:fontFamily="@font/inter_semibold"
+        android:textColor="@color/white"
+        android:stateListAnimator="@null"
+        android:elevation="0dp"
+        app:layout_constraintTop_toBottomOf="@id/btnLogout"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- ══ BOTTOM NAV ══ -->
+    <include
+        android:id="@+id/bottomNavProfile"
+        layout="@layout/bottom_nav"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/nav_height"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

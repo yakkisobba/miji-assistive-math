@@ -1,6 +1,146 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent">
+<!--
+    Shared bottom navigation bar — included in all three screens.
+    In each Activity, set the active tab by calling BottomNavHelper.setActiveTab(navView, Tab.HOME)
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+    Icon replacement guide:
+        ivNavHome    → @drawable/ic_home        (house icon, 24×24dp)
+        ivNavScan    → @drawable/ic_scan        (camera icon, 24×24dp)
+        ivNavProfile → @drawable/ic_profile     (person icon, 24×24dp)
+-->
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/bottomNav"
+    android:layout_width="match_parent"
+    android:layout_height="64dp"
+    android:background="@drawable/bg_nav_bar"
+    android:orientation="horizontal"
+    android:gravity="center_vertical">
+
+    <!-- ── HOME TAB ── -->
+    <LinearLayout
+        android:id="@+id/navHome"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:clickable="true"
+        android:focusable="true">
+
+        <!-- Icon wrapper — tinted background when active -->
+        <FrameLayout
+            android:id="@+id/navHomeBg"
+            android:layout_width="44dp"
+            android:layout_height="32dp"
+            android:background="@drawable/bg_nav_active">
+            <!-- bg_nav_active is semi-transparent accent; set visibility GONE for inactive tabs -->
+
+            <ImageView
+                android:id="@+id/ivNavHome"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_home"
+                android:contentDescription="Home"
+                android:scaleType="fitCenter" />
+            <!--
+                REPLACE: @drawable/ic_placeholder_home
+                WITH   : @drawable/ic_home
+                Active colour: #EBFF57  |  Inactive colour: #FFFFFF (set tint in code)
+            -->
+        </FrameLayout>
+
+        <TextView
+            android:id="@+id/tvNavHome"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="@string/nav_home"
+            android:textSize="10sp"
+            android:fontFamily="@font/inter_regular"
+            android:textColor="@color/accent" />
+        <!-- Active text colour = accent; inactive = white — set in code -->
+    </LinearLayout>
+
+    <!-- ── SCAN TAB ── -->
+    <LinearLayout
+        android:id="@+id/navScan"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:clickable="true"
+        android:focusable="true">
+
+        <FrameLayout
+            android:id="@+id/navScanBg"
+            android:layout_width="44dp"
+            android:layout_height="32dp"
+            android:background="@android:color/transparent">
+
+            <ImageView
+                android:id="@+id/ivNavScan"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_scan"
+                android:contentDescription="Scan"
+                android:scaleType="fitCenter" />
+        </FrameLayout>
+
+        <TextView
+            android:id="@+id/tvNavScan"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="@string/nav_scan"
+            android:textSize="10sp"
+            android:fontFamily="@font/inter_regular"
+            android:textColor="@color/white" />
+    </LinearLayout>
+
+    <!-- ── PROFILE TAB ── -->
+    <LinearLayout
+        android:id="@+id/navProfile"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:clickable="true"
+        android:focusable="true">
+
+        <FrameLayout
+            android:id="@+id/navProfileBg"
+            android:layout_width="44dp"
+            android:layout_height="32dp"
+            android:background="@android:color/transparent">
+
+            <ImageView
+                android:id="@+id/ivNavProfile"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_profile"
+                android:contentDescription="Profile"
+                android:scaleType="fitCenter" />
+            <!--
+                REPLACE: @drawable/ic_placeholder_profile
+                WITH   : @drawable/ic_profile
+            -->
+        </FrameLayout>
+
+        <TextView
+            android:id="@+id/tvNavProfile"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:text="@string/nav_profile"
+            android:textSize="10sp"
+            android:fontFamily="@font/inter_regular"
+            android:textColor="@color/white" />
+    </LinearLayout>
+
+</LinearLayout>

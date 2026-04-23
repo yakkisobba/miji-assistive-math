@@ -1,9 +1,116 @@
-<resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme. -->
-    <style name="Base.Theme.Mijiassistivemath" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Customize your light theme here. -->
-        <!-- <item name="colorPrimary">@color/my_light_primary</item> -->
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="Theme.Miji" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/accent</item>
+        <item name="colorOnPrimary">@color/background</item>
+        <item name="colorSurface">@color/surface</item>
+        <item name="colorOnSurface">@color/white</item>
+        <item name="android:windowBackground">@color/background</item>
+        <item name="android:statusBarColor">@color/background</item>
+        <item name="android:navigationBarColor">@color/background</item>
+        <item name="android:windowLightStatusBar">false</item>
     </style>
 
-    <style name="Theme.Mijiassistivemath" parent="Base.Theme.Mijiassistivemath" />
+    <style name="TextAppearance.Miji" parent="android:TextAppearance" />
+
+    <!-- Miji Logo / App title text -->
+    <style name="TextAppearance.Miji.Logo">
+        <item name="android:fontFamily">@font/inter_bold</item>
+        <item name="android:textSize">48sp</item>
+        <item name="android:textColor">@color/accent</item>
+        <item name="android:letterSpacing">0.02</item>
+    </style>
+
+    <!-- Section / card title -->
+    <style name="TextAppearance.Miji.Title">
+        <item name="android:fontFamily">@font/inter_semibold</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:textColor">@color/accent</item>
+    </style>
+
+    <!-- Body / subtitle -->
+    <style name="TextAppearance.Miji.Body">
+        <item name="android:fontFamily">@font/inter_regular</item>
+        <item name="android:textSize">10sp</item>
+        <item name="android:textColor">@color/white</item>
+    </style>
+
+    <!-- Module / list item label -->
+    <style name="TextAppearance.Miji.Module">
+        <item name="android:fontFamily">@font/inter_medium</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:textColor">@color/accent</item>
+    </style>
+
+    <!-- Section header (e.g., "Self-Learning Modules") -->
+    <style name="TextAppearance.Miji.SectionHeader">
+        <item name="android:fontFamily">@font/inter_semibold</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:textColor">@color/white</item>
+    </style>
+
+    <!-- Nav label -->
+    <style name="TextAppearance.Miji.NavLabel">
+        <item name="android:fontFamily">@font/inter_regular</item>
+        <item name="android:textSize">10sp</item>
+        <item name="android:textColor">@color/white</item>
+    </style>
+
+    <!-- Nav label active -->
+    <style name="TextAppearance.Miji.NavLabel.Active">
+        <item name="android:textColor">@color/accent</item>
+    </style>
+
+    <!-- Scan "AUTO-CAPTURE READY" label -->
+    <style name="TextAppearance.Miji.ScanStatus">
+        <item name="android:fontFamily">@font/inter_medium</item>
+        <item name="android:textSize">10sp</item>
+        <item name="android:textColor">@color/white</item>
+        <item name="android:letterSpacing">0.12</item>
+    </style>
+
+    <!-- Profile name -->
+    <style name="TextAppearance.Miji.ProfileName">
+        <item name="android:fontFamily">@font/inter_semibold</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:textColor">@color/white</item>
+    </style>
+
+    <!-- Profile username -->
+    <style name="TextAppearance.Miji.ProfileUsername">
+        <item name="android:fontFamily">@font/inter_regular</item>
+        <item name="android:textSize">10sp</item>
+        <item name="android:textColor">@color/white</item>
+        <item name="android:alpha">0.6</item>
+    </style>
+
+    <!-- Logout button text -->
+    <style name="TextAppearance.Miji.ButtonLogout">
+        <item name="android:fontFamily">@font/inter_semibold</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:textColor">@color/background</item>
+    </style>
+
+    <!-- Delete button text -->
+    <style name="TextAppearance.Miji.ButtonDelete">
+        <item name="android:fontFamily">@font/inter_semibold</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:textColor">@color/white</item>
+    </style>
+
+    <!-- Speaking Now title -->
+    <style name="TextAppearance.Miji.SpeakingTitle">
+        <item name="android:fontFamily">@font/inter_semibold</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:textColor">@color/accent</item>
+    </style>
+
+    <!-- Speaking Now subtitle -->
+    <style name="TextAppearance.Miji.SpeakingSubtitle">
+        <item name="android:fontFamily">@font/inter_regular</item>
+        <item name="android:textSize">10sp</item>
+        <item name="android:textColor">@color/white</item>
+    </style>
+
 </resources>

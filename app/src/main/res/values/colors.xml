@@ -1,5 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="black">#FF000000</color>
-    <color name="white">#FFFFFFFF</color>
+    <!-- Primary brand yellow-green -->
+    <color name="accent">#EBFF57</color>
+    <!-- White text -->
+    <color name="white">#FFFFFF</color>
+    <!-- Card / surface background -->
+    <color name="surface">#1E1E1E</color>
+    <!-- Deepest background -->
+    <color name="background">#0D0D0D</color>
+    <!-- Danger / delete -->
+    <color name="danger">#E05C5C</color>
+    <!-- Semi-transparent overlay for nav active -->
+    <color name="nav_active_bg">#33EBFF57</color>
+    <!-- Toggle track active -->
+    <color name="toggle_active">#EBFF57</color>
+    <!-- Toggle track inactive -->
+    <color name="toggle_inactive">#3A3A3A</color>
+    <!-- Divider -->
+    <color name="divider">#2A2A2A</color>
+    <!-- Scan frame corner -->
+    <color name="scan_frame">#EBFF57</color>
+    <!-- Camera overlay bg -->
+    <color name="camera_bg">#2A2A2A</color>
 </resources>

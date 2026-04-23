@@ -33,4 +33,14 @@
     <string name="nav_home">Home</string>
     <string name="nav_scan">Scan</string>
     <string name="nav_profile">Profile</string>
+
+    <!-- Classroom Session Dialog -->
+    <string name="classroom_session">Classroom Session</string>
+    <string name="create_lobby">Create Lobby</string>
+    <string name="host_new_session">Host a new session</string>
+    <string name="join_lobby">Join Lobby</string>
+    <string name="enter_lobby_code">Enter a lobby code</string>
+    <string name="how_it_works">How It Works</string>
+    <string name="learn_classroom_mode">Learn how to use classroom mode</string>
+    <string name="close">Close</string>
 </resources>

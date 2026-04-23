@@ -37,6 +37,15 @@ class ProfileActivity : AppCompatActivity() {
         setupSettings()
         setupButtons()
         setupBottomNav()
+        setupTopBar()
+    }
+
+    // ── Top Bar ──────────────────────────────────────────────────────────────
+
+    private fun setupTopBar() {
+        findViewById<View>(R.id.btnMenu).setOnClickListener {
+            MenuHelper.showClassroomMenu(this)
+        }
     }
 
     // ── User info ──────────────────────────────────────────────────────────────

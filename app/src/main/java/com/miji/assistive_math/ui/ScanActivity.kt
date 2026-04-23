@@ -27,6 +27,15 @@ class ScanActivity : AppCompatActivity() {
         setupSpeakingCard()
         setupShutterRow()
         setupBottomNav()
+        setupTopBar()
+    }
+
+    // ── Top Bar ──────────────────────────────────────────────────────────────
+
+    private fun setupTopBar() {
+        findViewById<View>(R.id.btnMenu).setOnClickListener {
+            MenuHelper.showClassroomMenu(this)
+        }
     }
 
     // ── Speaking now card ──────────────────────────────────────────────────────

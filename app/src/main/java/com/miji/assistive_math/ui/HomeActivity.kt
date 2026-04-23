@@ -19,6 +19,15 @@ class HomeActivity : AppCompatActivity() {
         setupModules()
         setupScanCard()
         setupBottomNav()
+        setupTopBar()
+    }
+
+    // ── Top Bar ──────────────────────────────────────────────────────────────
+
+    private fun setupTopBar() {
+        findViewById<View>(R.id.btnMenu).setOnClickListener {
+            MenuHelper.showClassroomMenu(this)
+        }
     }
 
     // ── Module list ────────────────────────────────────────────────────────────

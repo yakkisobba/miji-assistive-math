@@ -71,12 +71,11 @@ class ProfileActivity : AppCompatActivity() {
         val toggle1 = findViewById<SwitchCompat>(R.id.toggleSetting1)
         toggle1.setOnCheckedChangeListener { _, isChecked ->
             // TODO: persist preference and apply setting
-            // e.g. SharedPreferences / DataStore
         }
 
         // Setting 2 — tappable row (add your own behaviour)
         findViewById<View>(R.id.rowSetting2).setOnClickListener {
-            // TODO: open Setting 2 detail / sub-screen
+            // TODO: open Setting 2 detail / sub-screen OR toggle depending on setting use
         }
     }
 

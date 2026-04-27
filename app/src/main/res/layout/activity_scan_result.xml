@@ -1,0 +1,365 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    SCAN RESULT SCREEN
+    Colors : background=#0D0D0D  surface=#1E1E1E  accent=#EBFF57  white=#FFFFFF
+    Font   : Inter  (48sp logo / 14sp titles / 10sp subtitles)
+    Icons  : Replace @drawable/ic_placeholder_* with your actual icon drawables
+-->
+<androidx.coordinatorlayout.widget.CoordinatorLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#0D0D0D"
+    android:fitsSystemWindows="true">
+
+    <!-- ── SCROLLABLE CONTENT ── -->
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/scrollContent"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clipToPadding="false"
+        android:paddingBottom="80dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingHorizontal="20dp"
+            android:paddingTop="16dp">
+
+            <!-- ══ TOP BAR ══ -->
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginBottom="16dp">
+
+                <!-- Back arrow button -->
+                <ImageView
+                    android:id="@+id/btnBack"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:layout_centerVertical="true"
+                    android:layout_alignParentStart="true"
+                    android:padding="8dp"
+                    android:src="@drawable/ic_back"
+                    android:contentDescription="Back"
+                    android:scaleType="fitCenter"
+                    android:background="?attr/selectableItemBackgroundBorderless" />
+                <!--
+                    REPLACE: android:src="@drawable/ic_placeholder_back"
+                    WITH   : android:src="@drawable/ic_back"
+                    White back/left-arrow icon (24×24dp)
+                -->
+            </RelativeLayout>
+
+            <!-- ══ RECOGNIZED CARD ══ -->
+            <LinearLayout
+                android:id="@+id/cardRecognized"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:background="@drawable/bg_card_surface"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <!-- Row: "Recognized" label + confidence -->
+                <RelativeLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp">
+
+                    <TextView
+                        android:id="@+id/tvRecognizedLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentStart="true"
+                        android:layout_centerVertical="true"
+                        android:text="Recognized"
+                        android:textSize="14sp"
+                        android:fontFamily="@font/inter_semibold"
+                        android:textColor="#EBFF57" />
+
+                    <TextView
+                        android:id="@+id/tvConfidence"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentEnd="true"
+                        android:layout_centerVertical="true"
+                        android:text="CNN Confidence: 93.4%"
+                        android:textSize="10sp"
+                        android:fontFamily="@font/inter_regular"
+                        android:textColor="#FFFFFF"
+                        android:alpha="0.55" />
+                </RelativeLayout>
+
+                <!-- Big equation display -->
+                <TextView
+                    android:id="@+id/tvEquation"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="6dp"
+                    android:text="2 + 6 - 7"
+                    android:textSize="48sp"
+                    android:fontFamily="@font/inter_bold"
+                    android:textColor="#FFFFFF" />
+
+                <!-- Phonetic read text -->
+                <TextView
+                    android:id="@+id/tvEquationPhonetic"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="&quot;two plus six minus 7&quot;"
+                    android:textSize="10sp"
+                    android:fontFamily="@font/inter_regular"
+                    android:textColor="#FFFFFF"
+                    android:alpha="0.55" />
+            </LinearLayout>
+
+            <!-- ══ ACTION BUTTONS ROW (Scan Again + Read Aloud) ══ -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="24dp"
+                android:orientation="horizontal"
+                android:weightSum="2">
+
+                <!-- Scan Again -->
+                <LinearLayout
+                    android:id="@+id/btnScanAgain"
+                    android:layout_width="0dp"
+                    android:layout_height="56dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="8dp"
+                    android:background="@drawable/bg_btn_accent"
+                    android:orientation="horizontal"
+                    android:gravity="center"
+                    android:clickable="true"
+                    android:focusable="true">
+
+                    <ImageView
+                        android:id="@+id/ivScanAgainIcon"
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:layout_marginEnd="8dp"
+                        android:src="@drawable/ic_camera"
+                        android:contentDescription="Scan Again"
+                        android:scaleType="fitCenter"
+                        app:tint="#0D0D0D" />
+                    <!--
+                        REPLACE: android:src="@drawable/ic_placeholder_camera"
+                        WITH   : android:src="@drawable/ic_camera"
+                        Camera icon tinted dark (#0D0D0D) to show on yellow button
+                    -->
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Scan Again"
+                        android:textSize="14sp"
+                        android:fontFamily="@font/inter_semibold"
+                        android:textColor="#0D0D0D" />
+                </LinearLayout>
+
+                <!-- Read Aloud -->
+                <LinearLayout
+                    android:id="@+id/btnReadAloud"
+                    android:layout_width="0dp"
+                    android:layout_height="56dp"
+                    android:layout_weight="1"
+                    android:layout_marginStart="8dp"
+                    android:background="@drawable/bg_btn_accent"
+                    android:orientation="horizontal"
+                    android:gravity="center"
+                    android:clickable="true"
+                    android:focusable="true">
+
+                    <ImageView
+                        android:id="@+id/ivReadAloudIcon"
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:layout_marginEnd="8dp"
+                        android:src="@drawable/ic_play"
+                        android:contentDescription="Read Aloud"
+                        android:scaleType="fitCenter"
+                        app:tint="#0D0D0D" />
+                    <!--
+                        REPLACE: android:src="@drawable/ic_placeholder_play"
+                        WITH   : android:src="@drawable/ic_play"
+                        Play/triangle icon tinted dark (#0D0D0D)
+                    -->
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Read Aloud"
+                        android:textSize="14sp"
+                        android:fontFamily="@font/inter_semibold"
+                        android:textColor="#0D0D0D" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- ══ YOUR ANSWER SECTION ══ -->
+            <TextView
+                android:id="@+id/tvYourAnswerLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="10dp"
+                android:text="Your Answer"
+                android:textSize="14sp"
+                android:fontFamily="@font/inter_semibold"
+                android:textColor="#FFFFFF" />
+
+            <!-- Answer input row -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <!-- Text input field -->
+                <EditText
+                    android:id="@+id/etAnswer"
+                    android:layout_width="0dp"
+                    android:layout_height="56dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="10dp"
+                    android:background="@drawable/bg_card_surface"
+                    android:paddingHorizontal="16dp"
+                    android:hint="Type here..."
+                    android:textColorHint="#80FFFFFF"
+                    android:textColor="#FFFFFF"
+                    android:textSize="14sp"
+                    android:fontFamily="@font/inter_regular"
+                    android:inputType="numberDecimal|numberSigned"
+                    android:singleLine="true" />
+
+                <!-- Mic button -->
+                <FrameLayout
+                    android:id="@+id/btnMic"
+                    android:layout_width="56dp"
+                    android:layout_height="56dp"
+                    android:background="@drawable/bg_card_surface"
+                    android:clickable="true"
+                    android:focusable="true">
+
+                    <ImageView
+                        android:id="@+id/ivMicIcon"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:layout_gravity="center"
+                        android:src="@drawable/ic_mic"
+                        android:contentDescription="Voice Input"
+                        android:scaleType="fitCenter"
+                        app:tint="#EBFF57" />
+                    <!--
+                        REPLACE: android:src="@drawable/ic_placeholder_mic"
+                        WITH   : android:src="@drawable/ic_mic"
+                        Microphone icon tinted accent yellow (#EBFF57)
+                    -->
+                </FrameLayout>
+            </LinearLayout>
+
+            <!-- Submit Answer button -->
+            <LinearLayout
+                android:id="@+id/btnSubmitAnswer"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginBottom="12dp"
+                android:background="@drawable/bg_btn_accent"
+                android:gravity="center"
+                android:orientation="horizontal"
+                android:clickable="true"
+                android:focusable="true">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Submit Answer"
+                    android:textSize="14sp"
+                    android:fontFamily="@font/inter_semibold"
+                    android:textColor="#0D0D0D" />
+            </LinearLayout>
+
+            <!-- Read Step-by-Step Solution Aloud button -->
+            <LinearLayout
+                android:id="@+id/btnReadSolution"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginBottom="24dp"
+                android:background="@drawable/bg_btn_accent"
+                android:gravity="center"
+                android:orientation="horizontal"
+                android:clickable="true"
+                android:focusable="true">
+
+                <ImageView
+                    android:id="@+id/ivReadSolutionIcon"
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:layout_marginEnd="10dp"
+                    android:src="@drawable/ic_play"
+                    android:contentDescription="Read Solution"
+                    android:scaleType="fitCenter"
+                    app:tint="#0D0D0D" />
+                <!--
+                    REPLACE: android:src="@drawable/ic_placeholder_play"
+                    WITH   : android:src="@drawable/ic_play"
+                    Play/triangle icon tinted dark (#0D0D0D)
+                -->
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Read Step-by-Step Solution Aloud"
+                    android:textSize="14sp"
+                    android:fontFamily="@font/inter_semibold"
+                    android:textColor="#0D0D0D" />
+            </LinearLayout>
+
+            <!-- ══ SOLUTION SECTION ══ -->
+            <TextView
+                android:id="@+id/tvSolutionLabel"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="10dp"
+                android:text="Solution"
+                android:textSize="14sp"
+                android:fontFamily="@font/inter_semibold"
+                android:textColor="#FFFFFF" />
+
+            <!-- Solution card -->
+            <LinearLayout
+                android:id="@+id/cardSolution"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="16dp"
+                android:background="@drawable/bg_card_surface"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:id="@+id/tvSolutionContent"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="note: ma p-populate lang &apos;to once &quot;read solution&quot; button is clicked."
+                    android:textSize="10sp"
+                    android:fontFamily="@font/inter_regular"
+                    android:textColor="#FFFFFF"
+                    android:alpha="0.75"
+                    android:lineSpacingExtra="4dp" />
+            </LinearLayout>
+
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
+
+    <!-- ══ BOTTOM NAV (pinned) ══ -->
+    <include
+        layout="@layout/bottom_nav"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:layout_gravity="bottom"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior" />
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

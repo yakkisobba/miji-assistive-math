@@ -4,13 +4,13 @@
 //   - Python AI service on http://localhost:8000 via HTTP
 
 plugins {
-    kotlin("jvm") version "1.9.24"
+    kotlin("jvm")
     application
 }
 
-repositories {
-    mavenCentral()
-}
+// Note: repositories are declared centrally in settings.gradle.kts under
+// dependencyResolutionManagement. Per FAIL_ON_PROJECT_REPOS, modules must NOT
+// declare their own repositories. google() and mavenCentral() are inherited.
 
 dependencies {
     // HTTP client for talking to the Python AI service (localhost:8000)
@@ -30,5 +30,6 @@ application {
 }
 
 kotlin {
-    jvmToolchain(17)
+    // Match the JDK that the :app module compiles against (Java 11)
+    jvmToolchain(11)
 }

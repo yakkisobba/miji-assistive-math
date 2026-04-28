@@ -110,11 +110,10 @@
 
     <!-- ══ CAMERA VIEWFINDER ══ -->
     <!--
-        Replace this FrameLayout with:
-            <androidx.camera.view.PreviewView
-                android:id="@+id/cameraPreview"
-                ... />
-        once CameraX dependency is added.
+        Layered viewfinder:
+          1. PreviewView   — live camera feed (behind)
+          2. ScanFrameView — yellow corner brackets (on top)
+        Order matters: in a FrameLayout, later children draw on top of earlier ones.
     -->
     <FrameLayout
         android:id="@+id/cameraPreviewContainer"
@@ -128,6 +127,14 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintBottom_toTopOf="@id/shutterRow"
         app:layout_constraintVertical_chainStyle="spread">
+
+        <!-- Live camera feed (drawn first = bottom of the stack) -->
+        <androidx.camera.view.PreviewView
+            android:id="@+id/cameraPreview"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            app:scaleType="fillCenter"
+            app:implementationMode="performance" />
 
         <!--
             Scan frame corners overlay — drawn via custom ScanFrameView.

@@ -1,13 +1,17 @@
 package com.miji.assistive_math.ui
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.speech.tts.TextToSpeech
 import android.view.View
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import com.miji.assistive_math.R
 import java.util.Locale
 
@@ -29,6 +33,15 @@ class ScanResultActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     // ── TTS ───────────────────────────────────────────────────────────────────
     private lateinit var tts: TextToSpeech
+
+    // ── Mic permission ─────────────────────────────────────────────────────────
+    // Registers a callback for the system permission dialog. We don't show
+    // the dialog here — we just declare what to do when the user responds.
+    // .launch(...) (called from the mic button) is what actually shows it.
+    private val requestMicPermission =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) startListening() else showMicDeniedMessage()
+        }
 
     // ── Data passed from ScanActivity ─────────────────────────────────────────
     private var equationDisplay: String = ""
@@ -106,12 +119,14 @@ class ScanResultActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             speakText(equationPhonetic)
         }
 
-        // Mic button – launch speech-to-text for answer input
+        // Mic button – launch speech-to-text for answer input.
+        // Permission gate: ask if not yet granted, then proceed.
         btnMic.setOnClickListener {
-            // TODO: Launch speech recognizer
-            // val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
-            // intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            // startActivityForResult(intent, REQUEST_SPEECH_INPUT)
+            if (hasMicPermission()) {
+                startListening()
+            } else {
+                requestMicPermission.launch(Manifest.permission.RECORD_AUDIO)
+            }
         }
 
         // Submit Answer – validate user's answer
@@ -155,6 +170,37 @@ class ScanResultActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private fun speakText(text: String) {
         tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, null)
+    }
+
+    // ── Mic permission helpers ─────────────────────────────────────────────────
+
+    private fun hasMicPermission(): Boolean {
+        return ContextCompat.checkSelfPermission(
+            this, Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    /**
+     * Launch SpeechRecognizer to capture the student's spoken answer and
+     * populate etAnswer. Stub for now — to be implemented alongside the
+     * SpeechRecognizer checklist item.
+     */
+    private fun startListening() {
+        // TODO: launch SpeechRecognizer; on result write the recognized text into etAnswer.
+        // val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+        //     .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+        // startActivityForResult(intent, REQUEST_SPEECH_INPUT)
+    }
+
+    /**
+     * Graceful fallback when the user denies microphone permission.
+     * Routed through TTS so blind users get the explanation read aloud.
+     */
+    private fun showMicDeniedMessage() {
+        speakText(
+            "Microphone permission is needed to answer by voice. " +
+                    "Please enable Microphone access for MIJI in Settings."
+        )
     }
 
     // ── Companion ─────────────────────────────────────────────────────────────

@@ -4,17 +4,27 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.camera.core.Camera
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.ImageCapture
+import androidx.camera.core.Preview
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import com.miji.assistive_math.R
 import com.miji.assistive_math.ui.HomeActivity
 import com.miji.assistive_math.ui.ProfileActivity
 import com.miji.assistive_math.ui.BottomNavHelper
 import com.miji.assistive_math.ui.BottomNavHelper.Tab
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 
 /**
  * SCAN SCREEN
@@ -23,6 +33,19 @@ import com.miji.assistive_math.ui.BottomNavHelper.Tab
 class ScanActivity : AppCompatActivity() {
 
     private var isFlashOn = false
+
+    // Live CameraX handles, populated once startCamera() succeeds.
+    //   camera        — used for flash/torch control
+    //   imageCapture  — used by the shutter button to take a photo
+    // Both are nullable because the camera might never start (denied permission,
+    // no back camera, etc.), and click handlers should fail gracefully.
+    private var camera: Camera? = null
+    private var imageCapture: ImageCapture? = null
+
+    // Background thread for the YOLO frame analyzer. ImageAnalysis must run off
+    // the main thread or the UI will jank at 30 fps. Single-threaded so frames
+    // are processed in order without contention.
+    private val cameraExecutor: ExecutorService = Executors.newSingleThreadExecutor()
 
     // Registers a callback for the system permission dialog. We don't show
     // the dialog here — we just declare what to do when the user responds.
@@ -65,10 +88,65 @@ class ScanActivity : AppCompatActivity() {
 
     /**
      * Set up the live camera preview, shutter capture, and frame analysis.
-     * Implemented in step 5 (CameraX wiring). Until then this is a stub.
+     *
+     * Three CameraX use cases are bound to this Activity's lifecycle so they
+     * auto-start on resume and auto-stop on pause:
+     *   - Preview        → drives the PreviewView (the live viewfinder)
+     *   - ImageCapture   → snapshot photos when the shutter is pressed
+     *   - ImageAnalysis  → continuous frame stream for YOLO detection
      */
     private fun startCamera() {
-        // TODO (step 5): bind Preview / ImageCapture / ImageAnalysis to lifecycle.
+        val previewView = findViewById<PreviewView>(R.id.cameraPreview)
+
+        // ProcessCameraProvider is a singleton that lets us bind use cases.
+        // getInstance() returns a future because the provider may need to
+        // initialize on first call. We wait on the main thread executor so
+        // the bind below runs on the UI thread (required for lifecycle binding).
+        val providerFuture = ProcessCameraProvider.getInstance(this)
+        providerFuture.addListener({
+            val cameraProvider = providerFuture.get()
+
+            // 1) Preview — pipes camera frames to PreviewView.
+            val preview = Preview.Builder().build().also {
+                it.setSurfaceProvider(previewView.surfaceProvider)
+            }
+
+            // 2) ImageCapture — used later by the shutter button.
+            imageCapture = ImageCapture.Builder().build()
+
+            // 3) ImageAnalysis — used later for live YOLO detection. KEEP_ONLY_LATEST
+            //    drops older frames if the analyzer falls behind, which is what we
+            //    want for guidance ("is the paper centered?") rather than recording.
+            val imageAnalyzer = ImageAnalysis.Builder()
+                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                .build()
+                .also {
+                    it.setAnalyzer(cameraExecutor) { imageProxy ->
+                        // TODO: hand imageProxy to the YOLO detector once it's wired up.
+                        //       For now we just close it so CameraX can re-use the buffer.
+                        imageProxy.close()
+                    }
+                }
+
+            try {
+                // Unbind any previous use cases (e.g. on a configuration change)
+                // before binding fresh ones — CameraX will throw otherwise.
+                cameraProvider.unbindAll()
+                camera = cameraProvider.bindToLifecycle(
+                    this,
+                    CameraSelector.DEFAULT_BACK_CAMERA,
+                    preview,
+                    imageCapture,
+                    imageAnalyzer
+                )
+            } catch (e: Exception) {
+                // Possible causes: no back camera on the device, another app
+                // is holding the camera, or hardware error. Surface the same
+                // fallback we use for permission denial.
+                Log.e(TAG, "Camera bind failed", e)
+                showCameraDeniedMessage()
+            }
+        }, ContextCompat.getMainExecutor(this))
     }
 
     /**
@@ -153,5 +231,18 @@ class ScanActivity : AppCompatActivity() {
             onScan    = { /* already here */ },
             onProfile = { startActivity(Intent(this, ProfileActivity::class.java)) }
         )
+    }
+
+    // ── Lifecycle cleanup ──────────────────────────────────────────────────────
+
+    override fun onDestroy() {
+        super.onDestroy()
+        // Free the analyzer thread. CameraX itself is auto-unbound by the
+        // lifecycle binding, so we don't have to do anything for that.
+        cameraExecutor.shutdown()
+    }
+
+    companion object {
+        private const val TAG = "ScanActivity"
     }
 }

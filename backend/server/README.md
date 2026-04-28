@@ -1,6 +1,6 @@
-# MIJI Backend (Kotlin / JVM)
+# backend/server — Kotlin / JVM
 
-Kotlin backend module for MIJI. Runs on the teacher's laptop. Handles all networking with the Android devices over local Wi-Fi and delegates the AI work to the Python service in `../ai/`.
+Kotlin module for MIJI's backend. Runs on the teacher's laptop. Handles all networking with the Android devices over local Wi-Fi and delegates AI work to the Python service in `../ai/`.
 
 ## Folder structure
 
@@ -28,5 +28,5 @@ server/
 From the project root:
 
 ```bash
-./gradlew :server:run
+./gradlew :backend:server:run
 ```

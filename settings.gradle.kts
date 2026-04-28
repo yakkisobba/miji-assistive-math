@@ -24,5 +24,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "miji-assistive-math"
 include(":app")
-include(":server")
+include(":backend:server")
  

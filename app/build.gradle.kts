@@ -33,6 +33,11 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+
+    // Keep the PyTorch model file uncompressed in the APK so it loads correctly
+    androidResources {
+        noCompress += "pt"
+    }
 }
 
 dependencies {
@@ -41,6 +46,11 @@ dependencies {
     implementation(libs.androidx.constraintlayout)
     implementation(libs.androidx.core.ktx)
     implementation(libs.material)
+
+    // PyTorch Mobile — loads the traced CNN (mdas_symbol_cnn.pt) on-device
+    implementation(libs.pytorch.android)
+    implementation(libs.pytorch.android.torchvision)
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)

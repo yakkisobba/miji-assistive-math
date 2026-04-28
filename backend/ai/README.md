@@ -1,4 +1,4 @@
-# MIJI AI Service
+# backend/ai — Python AI service
 
 Python service for the AI components of MIJI: YOLOv8 detection, CNN classification, and SymPy math solving. Exposes an HTTP API at `localhost:8000` that the Kotlin backend (`../server/`) calls.
 

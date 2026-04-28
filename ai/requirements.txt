@@ -1,0 +1,23 @@
+# MIJI AI service dependencies
+# Install with: pip install -r requirements.txt
+
+# Web framework (Kotlin backend posts here at localhost:8000)
+fastapi
+uvicorn[standard]
+python-multipart       # for image upload
+
+# Core ML
+torch
+torchvision
+ultralytics            # YOLOv8
+
+# Image processing
+opencv-python
+numpy
+Pillow
+
+# Math solving
+sympy
+
+# Utilities
+tqdm

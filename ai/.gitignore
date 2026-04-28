@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Trained model artifacts (too large for git)
+models/*.pt
+models/*.pth
+models/*.onnx
+models/*.tflite
+
+# Datasets (download locally, do not commit)
+data/*
+!data/.gitkeep
+
+# Logs
+*.log
+runs/

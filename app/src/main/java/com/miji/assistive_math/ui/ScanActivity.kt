@@ -1,11 +1,15 @@
 package com.miji.assistive_math.ui
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.TextView
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import com.miji.assistive_math.R
 import com.miji.assistive_math.ui.HomeActivity
 import com.miji.assistive_math.ui.ProfileActivity
@@ -20,6 +24,18 @@ class ScanActivity : AppCompatActivity() {
 
     private var isFlashOn = false
 
+    // Registers a callback for the system permission dialog. We don't show
+    // the dialog here — we just declare what to do when the user responds.
+    // .launch(...) (called below) is what actually shows the dialog.
+    private val requestCameraPermission =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) {
+                startCamera()
+            } else {
+                showCameraDeniedMessage()
+            }
+        }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_scan)
@@ -28,6 +44,44 @@ class ScanActivity : AppCompatActivity() {
         setupShutterRow()
         setupBottomNav()
         setupTopBar()
+
+        // Permission gate: if already granted, just start the camera.
+        // Otherwise, ask — and the launcher's callback will route to
+        // startCamera() or showCameraDeniedMessage() based on the response.
+        if (hasCameraPermission()) {
+            startCamera()
+        } else {
+            requestCameraPermission.launch(Manifest.permission.CAMERA)
+        }
+    }
+
+    // ── Camera permission ──────────────────────────────────────────────────────
+
+    private fun hasCameraPermission(): Boolean {
+        return ContextCompat.checkSelfPermission(
+            this, Manifest.permission.CAMERA
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    /**
+     * Set up the live camera preview, shutter capture, and frame analysis.
+     * Implemented in step 5 (CameraX wiring). Until then this is a stub.
+     */
+    private fun startCamera() {
+        // TODO (step 5): bind Preview / ImageCapture / ImageAnalysis to lifecycle.
+    }
+
+    /**
+     * Graceful fallback when the user denies camera permission.
+     * Routes the explanation through the speaking card so the TTS layer
+     * (later checklist item) reads it aloud automatically.
+     */
+    private fun showCameraDeniedMessage() {
+        updateSpeakingCard(
+            "Camera permission is needed to scan equations. " +
+                    "Please enable Camera access for MIJI in Settings."
+        )
+        setAutoCaptureStatus("CAMERA UNAVAILABLE")
     }
 
     // ── Top Bar ──────────────────────────────────────────────────────────────

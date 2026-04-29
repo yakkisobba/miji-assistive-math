@@ -34,10 +34,9 @@ import java.util.concurrent.Executors
 class ScanActivity : AppCompatActivity() {
 
     private var isFlashOn = false
-
     private var camera: Camera? = null
     private var imageCapture: ImageCapture? = null
-
+    private var isCapturing = false
     private val cameraExecutor: ExecutorService = Executors.newSingleThreadExecutor()
 
     // ── Permission launchers ───────────────────────────────────────────────────
@@ -47,7 +46,6 @@ class ScanActivity : AppCompatActivity() {
             if (granted) startCamera() else showCameraDeniedMessage()
         }
 
-    // Gallery picker — receives the URI of the image the user selected
     private val galleryLauncher =
         registerForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
             uri?.let { handleGalleryImage(it) }
@@ -94,12 +92,14 @@ class ScanActivity : AppCompatActivity() {
 
             imageCapture = ImageCapture.Builder().build()
 
+            // ImageAnalysis — frames will be handed to YOLO detector by backend team
             val imageAnalyzer = ImageAnalysis.Builder()
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .build()
                 .also {
                     it.setAnalyzer(cameraExecutor) { imageProxy ->
-                        // TODO: hand imageProxy to YOLO detector
+                        // TODO: backend team wires YOLO detector here
+                        // They should call updateGuidance() with the result
                         imageProxy.close()
                     }
                 }
@@ -128,6 +128,57 @@ class ScanActivity : AppCompatActivity() {
         setAutoCaptureStatus("CAMERA UNAVAILABLE")
     }
 
+    // ── Guidance System ────────────────────────────────────────────────────────
+
+    /**
+     * Called by the YOLO detector (backend team) with a direction string.
+     * Accepted values:
+     *   "move_left"  / "move_right" / "move_up" / "move_down"
+     *   "hold_still" → triggers auto-capture
+     *   "capturing"  → currently capturing
+     *   anything else → show searching state
+     */
+    fun updateGuidance(direction: String) {
+        val cue = when (direction) {
+            "move_left"  -> GuidanceCue("Move camera to the left",          "ADJUST")
+            "move_right" -> GuidanceCue("Move camera to the right",         "ADJUST")
+            "move_up"    -> GuidanceCue("Move camera up",                   "ADJUST")
+            "move_down"  -> GuidanceCue("Move camera down",                 "ADJUST")
+            "move_up_left"    -> GuidanceCue("Move camera up and to the left",   "ADJUST")
+            "move_up_right"   -> GuidanceCue("Move camera up and to the right",  "ADJUST")
+            "move_down_left"  -> GuidanceCue("Move camera down and to the left", "ADJUST")
+            "move_down_right" -> GuidanceCue("Move camera down and to the right","ADJUST")
+            "hold_still" -> GuidanceCue("Hold still. Capturing equation…",  "CAPTURING", true)
+            "capturing"  -> GuidanceCue("Capturing equation…",              "CAPTURING…")
+            else         -> GuidanceCue("Point camera at an equation",       "SEARCHING…")
+        }
+        runOnUiThread { applyGuidance(cue) }
+    }
+
+    /**
+     * Guidance cue data class.
+     * [direction]  — human-readable instruction shown in speaking card
+     * [status]     — short label shown in AUTO-CAPTURE status
+     * [isCentered] — true when equation is centered and ready to capture
+     */
+    data class GuidanceCue(
+        val direction: String,
+        val status: String,
+        val isCentered: Boolean = false
+    )
+
+    /**
+     * Pushes guidance cue to UI and triggers auto-capture when centered.
+     */
+    private fun applyGuidance(cue: GuidanceCue) {
+        updateSpeakingCard(cue.direction)
+        setAutoCaptureStatus(cue.status)
+
+        if (cue.isCentered && !isCapturing) {
+            capturePhoto()
+        }
+    }
+
     // ── Top Bar ────────────────────────────────────────────────────────────────
 
     private fun setupTopBar() {
@@ -149,24 +200,22 @@ class ScanActivity : AppCompatActivity() {
     // ── Shutter Row ────────────────────────────────────────────────────────────
 
     private fun setupShutterRow() {
-
-        // ── Flash toggle ───────────────────────────────────────────────────────
         val ivFlash = findViewById<ImageView>(R.id.ivFlash)
+
+        // Flash toggle
         findViewById<View>(R.id.btnFlash).setOnClickListener {
             isFlashOn = !isFlashOn
             camera?.cameraControl?.enableTorch(isFlashOn)
-
-            // Tint icon accent when ON, white when OFF
             val tint = if (isFlashOn) getColor(R.color.accent) else getColor(R.color.white)
             ivFlash.setColorFilter(tint)
         }
 
-        // ── Shutter capture ────────────────────────────────────────────────────
+        // Shutter — manual capture
         findViewById<FrameLayout>(R.id.btnShutter).setOnClickListener {
             capturePhoto()
         }
 
-        // ── Gallery upload ─────────────────────────────────────────────────────
+        // Upload — gallery picker
         findViewById<View>(R.id.btnUpload).setOnClickListener {
             galleryLauncher.launch("image/*")
         }
@@ -175,16 +224,15 @@ class ScanActivity : AppCompatActivity() {
     // ── Photo capture ──────────────────────────────────────────────────────────
 
     private fun capturePhoto() {
-        val capture = imageCapture ?: run {
-            Log.w(TAG, "capturePhoto: imageCapture not ready")
-            return
-        }
+        val capture = imageCapture ?: return
+        if (isCapturing) return
 
-        // Save to app's cache directory
+        isCapturing = true
+        setAutoCaptureStatus("CAPTURING…")
+        updateSpeakingCard("Hold still. Capturing equation…")
+
         val photoFile = File(cacheDir, "scan_${System.currentTimeMillis()}.jpg")
         val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
-
-        setAutoCaptureStatus("CAPTURING…")
 
         capture.takePicture(
             outputOptions,
@@ -193,12 +241,15 @@ class ScanActivity : AppCompatActivity() {
                 override fun onImageSaved(output: ImageCapture.OutputFileResults) {
                     val uri = Uri.fromFile(photoFile)
                     Log.d(TAG, "Photo saved: $uri")
+                    isCapturing = false
                     setAutoCaptureStatus("PROCESSING…")
-                    // TODO: pass uri to your detector / socket layer
+                    updateSpeakingCard("Processing equation…")
+                    // TODO: pass uri to YOLO detector / socket layer
                 }
 
                 override fun onError(exception: ImageCaptureException) {
                     Log.e(TAG, "Capture failed: ${exception.message}", exception)
+                    isCapturing = false
                     setAutoCaptureStatus("AUTO-CAPTURE READY")
                     updateSpeakingCard("Capture failed. Please try again.")
                 }
@@ -211,7 +262,8 @@ class ScanActivity : AppCompatActivity() {
     private fun handleGalleryImage(uri: Uri) {
         Log.d(TAG, "Gallery image selected: $uri")
         setAutoCaptureStatus("PROCESSING…")
-        // TODO: pass uri to your detector / socket layer
+        updateSpeakingCard("Processing selected image…")
+        // TODO: pass uri to YOLO detector / socket layer
     }
 
     // ── Auto-capture state ─────────────────────────────────────────────────────

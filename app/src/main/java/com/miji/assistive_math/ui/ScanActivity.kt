@@ -28,6 +28,15 @@ import java.io.File
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
+
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Matrix
+import androidx.exifinterface.media.ExifInterface
+import com.miji.assistive_math.ml.ExpressionRecognizer
+import com.miji.assistive_math.ml.RecognitionOutput
+
+
 /**
  * SCAN SCREEN
  */
@@ -38,6 +47,7 @@ class ScanActivity : AppCompatActivity() {
     private var imageCapture: ImageCapture? = null
     private var isCapturing = false
     private val cameraExecutor: ExecutorService = Executors.newSingleThreadExecutor()
+    private var expressionRecognizer: ExpressionRecognizer? = null
 
     // ── Permission launchers ───────────────────────────────────────────────────
 
@@ -69,6 +79,16 @@ class ScanActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         cameraExecutor.shutdown()
+    }
+
+    private fun getExpressionRecognizer(): ExpressionRecognizer {
+        if (expressionRecognizer == null) {
+            Log.d(TAG, "Initializing ExpressionRecognizer and model...")
+            expressionRecognizer = ExpressionRecognizer(applicationContext)
+            Log.d(TAG, "ExpressionRecognizer initialized.")
+        }
+
+        return expressionRecognizer!!
     }
 
     // ── Camera permission ──────────────────────────────────────────────────────
@@ -244,7 +264,8 @@ class ScanActivity : AppCompatActivity() {
                     isCapturing = false
                     setAutoCaptureStatus("PROCESSING…")
                     updateSpeakingCard("Processing equation…")
-                    // TODO: pass uri to YOLO detector / socket layer
+
+                    processImageUri(uri)
                 }
 
                 override fun onError(exception: ImageCaptureException) {
@@ -263,7 +284,8 @@ class ScanActivity : AppCompatActivity() {
         Log.d(TAG, "Gallery image selected: $uri")
         setAutoCaptureStatus("PROCESSING…")
         updateSpeakingCard("Processing selected image…")
-        // TODO: pass uri to YOLO detector / socket layer
+
+        processImageUri(uri)
     }
 
     // ── Auto-capture state ─────────────────────────────────────────────────────
@@ -283,6 +305,190 @@ class ScanActivity : AppCompatActivity() {
             onScan    = { /* already here */ },
             onProfile = { startActivity(Intent(this, ProfileActivity::class.java)) }
         )
+    }
+
+    private fun processImageUri(uri: Uri) {
+        cameraExecutor.execute {
+            try {
+                val bitmap = loadBitmapFromUri(uri)
+
+                if (bitmap == null) {
+                    runOnUiThread {
+                        setAutoCaptureStatus("FAILED")
+                        updateSpeakingCard("Could not read the image. Please try again.")
+                    }
+                    return@execute
+                }
+
+                val recognizer = getExpressionRecognizer()
+                val output = recognizer.recognizeExpression(bitmap)
+
+                Log.d(TAG, "Detected symbols: ${output.detectedSymbolCount}")
+                Log.d(TAG, "Labels: ${output.labels}")
+                Log.d(TAG, "Expression: ${output.expression}")
+
+                output.predictions.forEachIndexed { index, prediction ->
+                    Log.d(
+                        TAG,
+                        "Symbol ${index + 1}: " +
+                                "Top1=${prediction.label}, " +
+                                "Conf=${prediction.confidence}, " +
+                                "Top2=${prediction.secondLabel}, " +
+                                "Top2Conf=${prediction.secondConfidence}, " +
+                                "Accepted=${prediction.accepted}"
+                    )
+                }
+
+                runOnUiThread {
+
+                    val hasRejectedPrediction = output.predictions.any {!it.accepted}
+
+                    if (output.detectedSymbolCount == 0 || output.expression.isBlank()) {
+                        setAutoCaptureStatus("NO SYMBOLS FOUND")
+                        updateSpeakingCard("No equation symbols were detected. Please try again.")
+                    } else if (hasRejectedPrediction){
+                        setAutoCaptureStatus("UNCERTAIN")
+                        updateSpeakingCard("The equation was unclear. Please retake the photo or move closer.")
+
+                        Log.d(TAG, "Recognition rejected because atleast one symbol was not accepted.")
+                        Log.d(TAG, "Rejected output labels: ${output.labels}")
+                        Log.d(TAG, "Rejected expression: ${output.expression}")
+                    } else {
+                        setAutoCaptureStatus("DONE")
+                        updateSpeakingCard("Equation recognized.")
+                        openResultScreen(output)
+                    }
+                }
+
+            } catch (e: Exception) {
+                Log.e(TAG, "Processing failed", e)
+
+                runOnUiThread {
+                    setAutoCaptureStatus("FAILED")
+                    updateSpeakingCard("Processing failed. Please try again.")
+                }
+            }
+        }
+    }
+
+    private fun loadBitmapFromUri(uri: Uri): Bitmap? {
+        val bitmap = contentResolver.openInputStream(uri).use { inputStream ->
+            if (inputStream == null) {
+                null
+            } else {
+                BitmapFactory.decodeStream(inputStream)
+            }
+        }
+
+        if (bitmap == null) {
+            return null
+        }
+
+        return rotateBitmapIfRequired(uri, bitmap)
+    }
+
+    private fun rotateBitmapIfRequired(uri: Uri, bitmap: Bitmap): Bitmap {
+        val orientation = contentResolver.openInputStream(uri).use { inputStream ->
+            if (inputStream == null) {
+                ExifInterface.ORIENTATION_NORMAL
+            } else {
+                val exif = ExifInterface(inputStream)
+                exif.getAttributeInt(
+                    ExifInterface.TAG_ORIENTATION,
+                    ExifInterface.ORIENTATION_NORMAL
+                )
+            }
+        }
+
+        val rotationDegrees = when (orientation) {
+            ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+            ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+            ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+            else -> 0f
+        }
+
+        if (rotationDegrees == 0f) {
+            return bitmap
+        }
+
+        val matrix = Matrix()
+        matrix.postRotate(rotationDegrees)
+
+        return Bitmap.createBitmap(
+            bitmap,
+            0,
+            0,
+            bitmap.width,
+            bitmap.height,
+            matrix,
+            true
+        )
+    }
+
+    private fun openResultScreen(output: RecognitionOutput) {
+        val confidencePercent = calculateAverageConfidence(output)
+        val displayEquation = formatExpressionForDisplay(output.expression)
+        val phonetic = expressionToPhonetic(output.expression)
+
+        val intent = Intent(this, ScanResultActivity::class.java).apply {
+            putExtra(ScanResultActivity.EXTRA_EQUATION_DISPLAY, displayEquation)
+            putExtra(ScanResultActivity.EXTRA_EQUATION_PHONETIC, phonetic)
+            putExtra(ScanResultActivity.EXTRA_CONFIDENCE, confidencePercent)
+        }
+
+        startActivity(intent)
+    }
+
+    private fun calculateAverageConfidence(output: RecognitionOutput): Float {
+        if (output.predictions.isEmpty()) {
+            return 0f
+        }
+
+        val average = output.predictions.map { it.confidence }.average().toFloat()
+
+        return average * 100f
+    }
+
+    private fun formatExpressionForDisplay(expression: String): String {
+        return expression
+            .replace("*", " × ")
+            .replace("/", " ÷ ")
+            .replace("+", " + ")
+            .replace("-", " - ")
+            .trim()
+    }
+
+    private fun expressionToPhonetic(expression: String): String {
+        val digitWords = mapOf(
+            '0' to "zero",
+            '1' to "one",
+            '2' to "two",
+            '3' to "three",
+            '4' to "four",
+            '5' to "five",
+            '6' to "six",
+            '7' to "seven",
+            '8' to "eight",
+            '9' to "nine"
+        )
+
+        val words = mutableListOf<String>()
+
+        for (char in expression) {
+            val word = when (char) {
+                in '0'..'9' -> digitWords[char] ?: char.toString()
+                '+' -> "plus"
+                '-' -> "minus"
+                '*' -> "times"
+                '/' -> "divided by"
+                '.' -> "point"
+                else -> char.toString()
+            }
+
+            words.add(word)
+        }
+
+        return words.joinToString(" ")
     }
 
     companion object {

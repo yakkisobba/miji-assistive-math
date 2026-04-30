@@ -36,7 +36,7 @@ android {
 
     // Keep the PyTorch model file uncompressed in the APK so it loads correctly
     androidResources {
-        noCompress += "pt"
+        noCompress += listOf("pt", "ptl")
     }
 }
 
@@ -47,7 +47,7 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.material)
 
-    // PyTorch Mobile — loads the traced CNN (mdas_symbol_cnn.pt) on-device
+    // PyTorch Lite — loads mdas_mobile_symbol_cnn.ptl
     implementation(libs.pytorch.android)
     implementation(libs.pytorch.android.torchvision)
 
@@ -56,6 +56,9 @@ dependencies {
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
+
+    // Fix image rotation from camera/gallery
+    implementation(libs.androidx.exifinterface)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.espresso.core)

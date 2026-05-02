@@ -18,11 +18,11 @@ class SymbolClassifier(
         "dot", "minus", "plus", "slash", "x"
     )
 
-    private val confidenceThreshold = 0.80f
-    private val marginThreshold = 0.20f
+    private val confidenceThreshold = 0.4f
+    private val marginThreshold = 0.1f
 
     init {
-        val modelPath = assetFilePath(context, "mdas_mobile_symbol_cnn.pt")
+        val modelPath = assetFilePath(context, "symbol_classifier_simple_cnn.pt")
         Log.d("SymbolClassifier", "Loading PyTorch Mobile model from: $modelPath")
         module = Module.load(modelPath)
         Log.d("SymbolClassifier", "PyTorch Mobile model loaded successfully")
@@ -31,7 +31,7 @@ class SymbolClassifier(
     fun classify(inputArray: FloatArray): PredictionResult {
         val inputTensor = Tensor.fromBlob(
             inputArray,
-            longArrayOf(1, 1, 32, 32)
+            longArrayOf(1, 1, 28, 28)
         )
 
         val outputTensor = module.forward(IValue.from(inputTensor)).toTensor()

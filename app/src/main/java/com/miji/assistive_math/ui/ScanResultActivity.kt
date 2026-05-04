@@ -4,6 +4,9 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import android.view.View
 import android.widget.EditText
@@ -34,10 +37,10 @@ class ScanResultActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     // ── TTS ───────────────────────────────────────────────────────────────────
     private lateinit var tts: TextToSpeech
 
+    // ── SpeechRecognizer ──────────────────────────────────────────────────────
+    private var speechRecognizer: SpeechRecognizer? = null
+
     // ── Mic permission ─────────────────────────────────────────────────────────
-    // Registers a callback for the system permission dialog. We don't show
-    // the dialog here — we just declare what to do when the user responds.
-    // .launch(...) (called from the mic button) is what actually shows it.
     private val requestMicPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             if (granted) startListening() else showMicDeniedMessage()
@@ -54,10 +57,9 @@ class ScanResultActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_scan_result)
 
-        // Read extras sent by ScanActivity
-        equationDisplay    = intent.getStringExtra(EXTRA_EQUATION_DISPLAY) ?: "2 + 6 - 7"
-        equationPhonetic   = intent.getStringExtra(EXTRA_EQUATION_PHONETIC) ?: "two plus six minus seven"
-        confidencePercent  = intent.getFloatExtra(EXTRA_CONFIDENCE, 93.4f)
+        equationDisplay   = intent.getStringExtra(EXTRA_EQUATION_DISPLAY) ?: "2 + 6 - 7"
+        equationPhonetic  = intent.getStringExtra(EXTRA_EQUATION_PHONETIC) ?: "two plus six minus seven"
+        confidencePercent = intent.getFloatExtra(EXTRA_CONFIDENCE, 93.4f)
 
         tts = TextToSpeech(this, this)
 
@@ -65,11 +67,13 @@ class ScanResultActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         populateData()
         setupListeners()
         setupBottomNav()
+        initSpeechRecognizer()
     }
 
     override fun onDestroy() {
         tts.stop()
         tts.shutdown()
+        speechRecognizer?.destroy()
         super.onDestroy()
     }
 
@@ -78,24 +82,26 @@ class ScanResultActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
             tts.language = Locale.ENGLISH
+            // Auto-read equation when screen opens
+            speakText("Equation recognized. $equationPhonetic")
         }
     }
 
     // ── Setup helpers ──────────────────────────────────────────────────────────
 
     private fun bindViews() {
-        btnBack             = findViewById(R.id.btnBack)
-        tvRecognizedLabel   = findViewById(R.id.tvRecognizedLabel)
-        tvConfidence        = findViewById(R.id.tvConfidence)
-        tvEquation          = findViewById(R.id.tvEquation)
-        tvEquationPhonetic  = findViewById(R.id.tvEquationPhonetic)
-        btnScanAgain        = findViewById(R.id.btnScanAgain)
-        btnReadAloud        = findViewById(R.id.btnReadAloud)
-        etAnswer            = findViewById(R.id.etAnswer)
-        btnMic              = findViewById(R.id.btnMic)
-        btnSubmitAnswer     = findViewById(R.id.btnSubmitAnswer)
-        btnReadSolution     = findViewById(R.id.btnReadSolution)
-        tvSolutionContent   = findViewById(R.id.tvSolutionContent)
+        btnBack            = findViewById(R.id.btnBack)
+        tvRecognizedLabel  = findViewById(R.id.tvRecognizedLabel)
+        tvConfidence       = findViewById(R.id.tvConfidence)
+        tvEquation         = findViewById(R.id.tvEquation)
+        tvEquationPhonetic = findViewById(R.id.tvEquationPhonetic)
+        btnScanAgain       = findViewById(R.id.btnScanAgain)
+        btnReadAloud       = findViewById(R.id.btnReadAloud)
+        etAnswer           = findViewById(R.id.etAnswer)
+        btnMic             = findViewById(R.id.btnMic)
+        btnSubmitAnswer    = findViewById(R.id.btnSubmitAnswer)
+        btnReadSolution    = findViewById(R.id.btnReadSolution)
+        tvSolutionContent  = findViewById(R.id.tvSolutionContent)
     }
 
     private fun populateData() {
@@ -105,31 +111,23 @@ class ScanResultActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun setupListeners() {
-        // Back arrow – close this screen
         btnBack.setOnClickListener { finish() }
 
-        // Scan Again – return to ScanActivity
         btnScanAgain.setOnClickListener {
             startActivity(Intent(this, ScanActivity::class.java))
             finish()
         }
 
-        // Read Aloud – speak the phonetic equation
         btnReadAloud.setOnClickListener {
             speakText(equationPhonetic)
         }
 
-        // Mic button – launch speech-to-text for answer input.
-        // Permission gate: ask if not yet granted, then proceed.
+        // ── Mic button ─────────────────────────────────────────────────────────
         btnMic.setOnClickListener {
-            if (hasMicPermission()) {
-                startListening()
-            } else {
-                requestMicPermission.launch(Manifest.permission.RECORD_AUDIO)
-            }
+            if (hasMicPermission()) startListening()
+            else requestMicPermission.launch(Manifest.permission.RECORD_AUDIO)
         }
 
-        // Submit Answer – validate user's answer
         btnSubmitAnswer.setOnClickListener {
             val userAnswer = etAnswer.text.toString().trim()
             if (userAnswer.isEmpty()) {
@@ -137,20 +135,143 @@ class ScanResultActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 return@setOnClickListener
             }
             // TODO: Evaluate answer against computed result
-            // val correct = evaluateAnswer(equationDisplay, userAnswer)
-            // showAnswerFeedback(correct)
         }
 
-        // Read Step-by-Step Solution Aloud
         btnReadSolution.setOnClickListener {
-            // TODO: Generate and populate step-by-step solution, then speak it
-            // val steps = SolutionEngine.solve(equationDisplay)
-            // tvSolutionContent.text = steps.formatted
-            // speakText(steps.spokenText)
-
-            // Placeholder: speak the equation answer
             speakText("The solution for $equationPhonetic will be shown here step by step.")
         }
+    }
+
+    // ── Speech Recognizer ──────────────────────────────────────────────────────
+
+    /**
+     * Initialize SpeechRecognizer once and reuse it.
+     * Checks device support before creating.
+     */
+    private fun initSpeechRecognizer() {
+        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
+            btnMic.isEnabled = false
+            return
+        }
+
+        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this)
+        speechRecognizer?.setRecognitionListener(object : RecognitionListener {
+
+            override fun onReadyForSpeech(params: Bundle?) {
+                etAnswer.hint = "Listening…"
+            }
+
+            override fun onBeginningOfSpeech() {
+                etAnswer.hint = "Hearing you…"
+            }
+
+            override fun onEndOfSpeech() {
+                etAnswer.hint = "Processing…"
+            }
+
+            override fun onResults(results: Bundle?) {
+                val matches = results
+                    ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                val recognized = matches?.firstOrNull() ?: ""
+
+                if (recognized.isNotEmpty()) {
+                    etAnswer.setText(recognized)
+                } else {
+                    speakText("Could not recognize speech. Please try again.")
+                }
+                etAnswer.hint = "Your answer"
+            }
+
+            override fun onError(error: Int) {
+                val message = when (error) {
+                    SpeechRecognizer.ERROR_NO_MATCH       -> "No speech detected. Please try again."
+                    SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "Listening timed out. Please try again."
+                    SpeechRecognizer.ERROR_AUDIO          -> "Audio recording error. Please try again."
+                    SpeechRecognizer.ERROR_NETWORK        -> "Network error. Please check your connection."
+                    else                                  -> "Something went wrong. Please try again."
+                }
+                etAnswer.hint = "Your answer"
+                speakText(message)
+            }
+
+            // Required overrides
+            override fun onRmsChanged(rmsdB: Float) {}
+            override fun onBufferReceived(buffer: ByteArray?) {}
+            override fun onPartialResults(partialResults: Bundle?) {}
+            override fun onEvent(eventType: Int, params: Bundle?) {}
+        })
+    }
+
+    /**
+     * Starts listening for the student's spoken answer.
+     */
+    private fun startListening() {
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.ENGLISH)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+            putExtra(RecognizerIntent.EXTRA_PROMPT, "Say your answer")
+        }
+        speechRecognizer?.startListening(intent)
+    }
+
+    // ── Loading / Processing state ─────────────────────────────────────────────
+
+    /**
+     * Called from ScanActivity while the model is running.
+     * Disables buttons and speaks "Processing…" via TTS.
+     */
+    fun showProcessingState() {
+        btnScanAgain.isEnabled    = false
+        btnReadAloud.isEnabled    = false
+        btnMic.isEnabled          = false
+        btnSubmitAnswer.isEnabled = false
+        btnReadSolution.isEnabled = false
+        tvSolutionContent.text    = "Processing…"
+        speakText("Processing equation. Please wait.")
+    }
+
+    /**
+     * Called when the model finishes — restores all buttons.
+     */
+    fun hideProcessingState() {
+        btnScanAgain.isEnabled    = true
+        btnReadAloud.isEnabled    = true
+        btnMic.isEnabled          = true
+        btnSubmitAnswer.isEnabled = true
+        btnReadSolution.isEnabled = true
+    }
+
+    // ── Error handling ─────────────────────────────────────────────────────────
+
+    /**
+     * Called when detection completely fails (crash, bad file, etc.)
+     */
+    fun showDetectionError() {
+        tvSolutionContent.text = "Detection failed. Please retake the photo."
+        speakText("Detection failed. Please go back and retake the photo.")
+    }
+
+    /**
+     * Called when symbols were detected but confidence is too low.
+     */
+    fun showUncertainError(expression: String) {
+        tvSolutionContent.text =
+            "Unclear equation: $expression. Please retake the photo."
+        speakText(
+            "The equation was unclear. " +
+                    "Detected $expression but confidence is low. " +
+                    "Please retake the photo or move closer."
+        )
+    }
+
+    /**
+     * Called when no symbols were detected at all.
+     */
+    fun showNoSymbolsError() {
+        tvSolutionContent.text = "No equation found. Please retake the photo."
+        speakText("No equation symbols were detected. Please go back and try again.")
     }
 
     // ── Bottom navigation ──────────────────────────────────────────────────────
@@ -174,28 +295,10 @@ class ScanResultActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     // ── Mic permission helpers ─────────────────────────────────────────────────
 
-    private fun hasMicPermission(): Boolean {
-        return ContextCompat.checkSelfPermission(
-            this, Manifest.permission.RECORD_AUDIO
-        ) == PackageManager.PERMISSION_GRANTED
-    }
+    private fun hasMicPermission(): Boolean =
+        ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
+                PackageManager.PERMISSION_GRANTED
 
-    /**
-     * Launch SpeechRecognizer to capture the student's spoken answer and
-     * populate etAnswer. Stub for now — to be implemented alongside the
-     * SpeechRecognizer checklist item.
-     */
-    private fun startListening() {
-        // TODO: launch SpeechRecognizer; on result write the recognized text into etAnswer.
-        // val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
-        //     .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-        // startActivityForResult(intent, REQUEST_SPEECH_INPUT)
-    }
-
-    /**
-     * Graceful fallback when the user denies microphone permission.
-     * Routed through TTS so blind users get the explanation read aloud.
-     */
     private fun showMicDeniedMessage() {
         speakText(
             "Microphone permission is needed to answer by voice. " +

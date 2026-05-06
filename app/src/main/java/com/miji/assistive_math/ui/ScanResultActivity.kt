@@ -8,6 +8,7 @@ import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import android.view.View
 import android.widget.EditText
 import android.widget.ImageView
@@ -73,10 +74,29 @@ class ScanResultActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         super.onDestroy()
     }
 
+    // AUTO READ: Equation → Solution
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
             tts.language = Locale.ENGLISH
-            speakText("Equation recognized. $equationPhonetic")
+
+            tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                override fun onDone(utteranceId: String?) {
+                    if (utteranceId == "eq_read") {
+                        runOnUiThread {
+                            readSolutionAloud()
+                        }
+                    }
+                }
+                override fun onError(utteranceId: String?) {}
+                override fun onStart(utteranceId: String?) {}
+            })
+
+            tts.speak(
+                "Equation recognized. $equationPhonetic",
+                TextToSpeech.QUEUE_FLUSH,
+                null,
+                "eq_read"
+            )
         }
     }
 
@@ -107,10 +127,6 @@ class ScanResultActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         btnScanAgain.setOnClickListener {
             startActivity(Intent(this, ScanActivity::class.java))
             finish()
-        }
-
-        btnReadAloud.setOnClickListener {
-            speakText(equationPhonetic)
         }
 
         btnMic.setOnClickListener {
@@ -144,10 +160,6 @@ class ScanResultActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 speakText("Incorrect. The answer is $correct")
             }
         }
-
-        btnReadSolution.setOnClickListener {
-            readSolutionAloud()
-        }
     }
 
     private fun speakText(text: String) {
@@ -166,13 +178,15 @@ class ScanResultActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         return map[input.lowercase()]?.toDouble() ?: input.toDoubleOrNull()
     }
 
-    // ── Step-by-step with precedence ──
+    // STEP-BY-STEP AUTO READ
     private fun readSolutionAloud() {
         val expr = equationDisplay.replace("×","*").replace("÷","/").replace(" ","")
         val tokens = tokenize(expr).toMutableList()
 
         val steps = mutableListOf<String>()
         val display = mutableListOf<String>()
+
+        steps.add("Let us solve the equation step by step.")
 
         var step = 1
 
@@ -217,20 +231,21 @@ class ScanResultActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
 
         display.add("Answer: $current")
-        steps.add("Final answer is $current")
+        steps.add("The final answer is $current")
 
         tvSolutionContent.text = display.joinToString("\n")
 
         tts.stop()
         steps.forEachIndexed { index, s ->
-            tts.speak(s,
+            tts.speak(
+                s,
                 if(index==0) TextToSpeech.QUEUE_FLUSH else TextToSpeech.QUEUE_ADD,
                 null,
-                "step$index")
+                "step$index"
+            )
         }
     }
 
-    // ── Math Engine ──
     private fun evaluateExpression(expr:String):Double?{
         return try{ evalArithmetic(expr.replace("×","*").replace("÷","/").replace(" ","")) }catch(e:Exception){null}
     }
@@ -335,4 +350,3 @@ class ScanResultActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         const val EXTRA_CONFIDENCE = "extra_confidence"
     }
 }
-

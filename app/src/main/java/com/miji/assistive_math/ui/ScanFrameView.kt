@@ -31,7 +31,13 @@ class ScanFrameView @JvmOverloads constructor(
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
-        frameRect.set(inset, inset, w - inset, h - inset)
+        // Draw a frame that is centered and takes up 85% width and 30% height
+        // This keeps the "scan zone" compact and away from UI buttons
+        val frameW = w * 0.85f
+        val frameH = h * 0.30f
+        val left   = (w - frameW) / 2f
+        val top    = (h - frameH) / 2f
+        frameRect.set(left, top, left + frameW, top + frameH)
     }
 
     override fun onDraw(canvas: Canvas) {

@@ -121,12 +121,14 @@
         android:layout_height="0dp"
         android:layout_marginHorizontal="@dimen/screen_padding_h"
         android:layout_marginTop="16dp"
+        android:layout_marginBottom="40dp"
         android:background="@color/camera_bg"
+        app:layout_constraintDimensionRatio="4:3"
         app:layout_constraintTop_toBottomOf="@id/cardSpeaking"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintBottom_toTopOf="@id/shutterRow"
-        app:layout_constraintVertical_chainStyle="spread">
+        app:layout_constraintVertical_chainStyle="packed">
 
         <!-- Live camera feed (drawn first = bottom of the stack) -->
         <androidx.camera.view.PreviewView
@@ -207,7 +209,6 @@
             android:id="@+id/btnShutter"
             android:layout_width="72dp"
             android:layout_height="72dp"
-            android:layout_marginBottom="16dp"
             android:background="@drawable/bg_shutter"
             android:clickable="true"
             android:focusable="true">

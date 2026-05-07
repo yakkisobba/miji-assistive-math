@@ -47,6 +47,10 @@ class ScanActivity : AppCompatActivity() {
     private var expressionRecognizer: ExpressionRecognizer? = null
     private lateinit var tts: TextToSpeech
 
+    // Throttle guidance so TTS doesn't spam every frame
+    private var lastGuidanceTime = 0L
+    private var lastDirection = ""
+
     // ── Permission launchers ───────────────────────────────────────────────────
 
     private val requestCameraPermission =
@@ -65,7 +69,6 @@ class ScanActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_scan)
 
-        // Initialize TTS
         tts = TextToSpeech(this) { status ->
             if (status == TextToSpeech.SUCCESS) {
                 tts.language = Locale.ENGLISH
@@ -125,8 +128,11 @@ class ScanActivity : AppCompatActivity() {
                 .build()
                 .also {
                     it.setAnalyzer(cameraExecutor) { imageProxy ->
-                        // TODO: backend team wires YOLO detector here
-                        // They should call updateGuidance() with the result
+                        if (!isCapturing) {
+                            val bitmap = imageProxy.toBitmap()
+                            val direction = analyzeFrame(bitmap)
+                            updateGuidance(direction)
+                        }
                         imageProxy.close()
                     }
                 }
@@ -170,14 +176,6 @@ class ScanActivity : AppCompatActivity() {
         val isCentered: Boolean = false
     )
 
-    /**
-     * Called by the YOLO detector (backend team) with a direction string.
-     * Accepted values:
-     *   "move_left" / "move_right" / "move_up" / "move_down"
-     *   "hold_still" → triggers auto-capture
-     *   "capturing"  → currently capturing
-     *   anything else → show searching state
-     */
     fun updateGuidance(direction: String) {
         val cue = when (direction) {
             "move_left"       -> GuidanceCue("Move camera to the left",           "ADJUST")
@@ -198,10 +196,116 @@ class ScanActivity : AppCompatActivity() {
     private fun applyGuidance(cue: GuidanceCue) {
         updateSpeakingCard(cue.direction)
         setAutoCaptureStatus(cue.status)
-        speakText(cue.direction)
+
+        // Only speak if direction changed or 3 seconds have passed
+        // This prevents TTS from spamming every frame
+        val now = System.currentTimeMillis()
+        if (cue.direction != lastDirection || now - lastGuidanceTime > GUIDANCE_INTERVAL_MS) {
+            speakText(cue.direction)
+            lastDirection = cue.direction
+            lastGuidanceTime = now
+        }
+
         if (cue.isCentered && !isCapturing) {
             capturePhoto()
         }
+    }
+
+    // ── Frame Analysis ─────────────────────────────────────────────────────────
+
+    /**
+     * Analyzes the camera frame to determine where the equation is
+     * and returns a direction string for updateGuidance()
+     */
+    private fun analyzeFrame(bitmap: Bitmap): String {
+        val cols = 3
+        val rows = 3
+        val cellW = bitmap.width / cols
+        val cellH = bitmap.height / rows
+
+        val brightness = Array(rows) { row ->
+            FloatArray(cols) { col ->
+                averageBrightness(bitmap, col * cellW, row * cellH, cellW, cellH)
+            }
+        }
+
+        var maxContrast = -1f
+        var contentRow = 1
+        var contentCol = 1
+
+        for (r in 0 until rows) {
+            for (c in 0 until cols) {
+                val contrast = computeLocalContrast(brightness, r, c, rows, cols)
+                if (contrast > maxContrast) {
+                    maxContrast = contrast
+                    contentRow = r
+                    contentCol = c
+                }
+            }
+        }
+
+        if (maxContrast < CONTRAST_THRESHOLD) {
+            return "searching"
+        }
+
+        val dRow = contentRow - 1
+        val dCol = contentCol - 1
+
+        return when {
+            dRow == 0 && dCol == 0 -> "hold_still"
+            dRow < 0 && dCol < 0   -> "move_up_left"
+            dRow < 0 && dCol > 0   -> "move_up_right"
+            dRow > 0 && dCol < 0   -> "move_down_left"
+            dRow > 0 && dCol > 0   -> "move_down_right"
+            dRow < 0               -> "move_up"
+            dRow > 0               -> "move_down"
+            dCol < 0               -> "move_left"
+            dCol > 0               -> "move_right"
+            else                   -> "hold_still"
+        }
+    }
+
+    private fun averageBrightness(
+        bitmap: Bitmap, x: Int, y: Int, w: Int, h: Int
+    ): Float {
+        var total = 0L
+        var count = 0
+        var px = x
+        while (px < x + w && px < bitmap.width) {
+            var py = y
+            while (py < y + h && py < bitmap.height) {
+                val pixel = bitmap.getPixel(px, py)
+                val r = (pixel shr 16) and 0xFF
+                val g = (pixel shr 8)  and 0xFF
+                val b = pixel          and 0xFF
+                total += (0.299 * r + 0.587 * g + 0.114 * b).toLong()
+                count++
+                py += SAMPLE_STEP
+            }
+            px += SAMPLE_STEP
+        }
+        return if (count == 0) 0f else total.toFloat() / count
+    }
+
+    private fun computeLocalContrast(
+        brightness: Array<FloatArray>, row: Int, col: Int, rows: Int, cols: Int
+    ): Float {
+        val cellVal = brightness[row][col]
+        var neighbourSum = 0f
+        var neighbourCount = 0
+        for (dr in -1..1) {
+            for (dc in -1..1) {
+                if (dr == 0 && dc == 0) continue
+                val nr = row + dr
+                val nc = col + dc
+                if (nr in 0 until rows && nc in 0 until cols) {
+                    neighbourSum += brightness[nr][nc]
+                    neighbourCount++
+                }
+            }
+        }
+        val avg = if (neighbourCount == 0) cellVal else neighbourSum / neighbourCount
+        return Math.abs(cellVal - avg)
     }
 
     // ── Top Bar ────────────────────────────────────────────────────────────────
@@ -227,7 +331,6 @@ class ScanActivity : AppCompatActivity() {
     private fun setupShutterRow() {
         val ivFlash = findViewById<ImageView>(R.id.ivFlash)
 
-        // Flash toggle
         findViewById<View>(R.id.btnFlash).setOnClickListener {
             isFlashOn = !isFlashOn
             camera?.cameraControl?.enableTorch(isFlashOn)
@@ -235,12 +338,10 @@ class ScanActivity : AppCompatActivity() {
             ivFlash.setColorFilter(tint)
         }
 
-        // Shutter — manual capture
         findViewById<FrameLayout>(R.id.btnShutter).setOnClickListener {
             capturePhoto()
         }
 
-        // Upload — gallery picker
         findViewById<View>(R.id.btnUpload).setOnClickListener {
             galleryLauncher.launch("image/*")
         }
@@ -474,5 +575,8 @@ class ScanActivity : AppCompatActivity() {
 
     companion object {
         private const val TAG = "ScanActivity"
+        private const val SAMPLE_STEP = 8
+        private const val CONTRAST_THRESHOLD = 10f
+        private const val GUIDANCE_INTERVAL_MS = 3000L // speak every 3 seconds
     }
 }

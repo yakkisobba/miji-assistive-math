@@ -4,6 +4,8 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -23,6 +25,7 @@ import kotlin.math.floor
 
 class ScanResultActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
+    // ── Views ──────────────────────────────────────────────────────────────────
     private lateinit var btnBack: ImageView
     private lateinit var tvRecognizedLabel: TextView
     private lateinit var tvConfidence: TextView
@@ -36,23 +39,30 @@ class ScanResultActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     private lateinit var btnReadSolution: View
     private lateinit var tvSolutionContent: TextView
 
+    // ── TTS ───────────────────────────────────────────────────────────────────
     private lateinit var tts: TextToSpeech
+
+    // ── SpeechRecognizer ──────────────────────────────────────────────────────
     private var speechRecognizer: SpeechRecognizer? = null
 
+    // ── Mic permission ─────────────────────────────────────────────────────────
     private val requestMicPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             if (granted) startListening() else showMicDeniedMessage()
         }
 
+    // ── Data passed from ScanActivity ─────────────────────────────────────────
     private var equationDisplay: String = ""
     private var equationPhonetic: String = ""
     private var confidencePercent: Float = 0f
 
+    // ── Flow state ─────────────────────────────────────────────────────────────
     private enum class FlowState {
         IDLE, READING_EQ, WAITING_STT, VERIFYING, READING_SOL
     }
     private var flowState = FlowState.IDLE
 
+    // ── Lifecycle ──────────────────────────────────────────────────────────────
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -72,12 +82,16 @@ class ScanResultActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
     override fun onDestroy() {
-        if (::tts.isInitialized) { tts.stop(); tts.shutdown() }
+        if (::tts.isInitialized) {
+            tts.stop()
+            tts.shutdown()
+        }
         speechRecognizer?.destroy()
         super.onDestroy()
     }
 
-    // Read Scanned Equation, auto-prompt STT
+    // ── TTS init — reads equation then auto-prompts STT ───────────────────────
+
     override fun onInit(status: Int) {
         if (status != TextToSpeech.SUCCESS) return
         tts.language = Locale.ENGLISH
@@ -89,7 +103,6 @@ class ScanResultActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             override fun onDone(utteranceId: String?) {
                 runOnUiThread {
                     when (flowState) {
-
                         FlowState.READING_EQ -> {
                             flowState = FlowState.WAITING_STT
                             speakThenListen(
@@ -97,18 +110,15 @@ class ScanResultActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                                 utteranceId = "prompt_stt"
                             )
                         }
-
                         FlowState.WAITING_STT -> {
                             if (utteranceId == "prompt_stt") {
                                 openMicForAnswer()
                             }
                         }
-
                         FlowState.VERIFYING -> {
                             flowState = FlowState.READING_SOL
                             readSolutionAloud()
                         }
-
                         else -> { /* IDLE or READING_SOL — nothing to chain */ }
                     }
                 }
@@ -124,12 +134,14 @@ class ScanResultActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         )
     }
 
+    // ── Mic helpers ────────────────────────────────────────────────────────────
 
-    // Listen to user for answer
     private fun openMicForAnswer() {
         if (hasMicPermission()) startListening()
         else requestMicPermission.launch(Manifest.permission.RECORD_AUDIO)
     }
+
+    // ── Speech Recognizer ──────────────────────────────────────────────────────
 
     private fun initSpeechRecognizer() {
         if (!SpeechRecognizer.isRecognitionAvailable(this)) {
@@ -160,23 +172,33 @@ class ScanResultActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 etAnswer.hint = "Your answer"
 
                 if (text.isNotEmpty()) {
+                    // Successfully recognized — submit answer
                     etAnswer.setText(text)
                     submitAnswer(text)
                 } else {
-                    speakText("Could not hear your answer. Please try again.")
+                    // Nothing recognized — speak and auto-retry
+                    speakText("Could not hear your answer. Listening again.")
+                    retryListeningAfterDelay()
                 }
             }
 
             override fun onError(error: Int) {
                 etAnswer.hint = "Your answer"
                 val msg = when (error) {
-                    SpeechRecognizer.ERROR_NO_MATCH       -> "No speech detected. Please tap the mic and try again."
-                    SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "Listening timed out. Please tap the mic and try again."
+                    SpeechRecognizer.ERROR_NO_MATCH       -> "No match found. Listening again."
+                    SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "Timed out. Listening again."
                     SpeechRecognizer.ERROR_AUDIO          -> "Audio error. Please try again."
                     SpeechRecognizer.ERROR_NETWORK        -> "Network error. Please check your connection."
-                    else                                  -> "Something went wrong. Please try again."
+                    else                                  -> "Something went wrong. Listening again."
                 }
                 speakText(msg)
+
+                // Auto-retry unless hardware/network error
+                when (error) {
+                    SpeechRecognizer.ERROR_AUDIO,
+                    SpeechRecognizer.ERROR_NETWORK -> { /* don't retry */ }
+                    else -> retryListeningAfterDelay()
+                }
             }
 
             override fun onRmsChanged(rmsdB: Float) {}
@@ -197,11 +219,25 @@ class ScanResultActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         speechRecognizer?.startListening(intent)
     }
 
-    // Verify correctness of answer
+    /**
+     * Waits for TTS to finish speaking then auto-restarts listening.
+     * Only retries when still in WAITING_STT state.
+     */
+    private fun retryListeningAfterDelay() {
+        Handler(Looper.getMainLooper()).postDelayed({
+            if (hasMicPermission() && flowState == FlowState.WAITING_STT) {
+                startListening()
+            }
+        }, RETRY_DELAY_MS)
+    }
+
+    // ── Answer verification ────────────────────────────────────────────────────
+
     private fun submitAnswer(input: String) {
         val userAnswer = parseSpokenNumber(input.trim())
         if (userAnswer == null) {
-            speakText("I did not understand that number. Please try again.")
+            speakText("I did not understand that number. Listening again.")
+            retryListeningAfterDelay()
             return
         }
 
@@ -215,7 +251,6 @@ class ScanResultActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
         if (abs(userAnswer - correctAnswer) < 0.001) {
             tvSolutionContent.text = "✓ Correct! Well done!"
-            // Utterance id "feedback" → triggers solution read in onDone
             tts.speak("Correct! Great job!", TextToSpeech.QUEUE_FLUSH, null, "feedback")
         } else {
             val correctStr = formatAnswerForSpeech(correctAnswer)
@@ -239,7 +274,8 @@ class ScanResultActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         return wordMap[input.lowercase()]?.toDouble() ?: input.toDoubleOrNull()
     }
 
-    // Read the complete step-by-step solution aloud
+    // ── Step-by-step solution ──────────────────────────────────────────────────
+
     private fun readSolutionAloud() {
         val expr = equationDisplay
             .replace("×", "*")
@@ -253,6 +289,7 @@ class ScanResultActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         speechSteps.add("Let us solve the equation step by step.")
         var stepNum = 1
         var i = 0
+
         while (i < tokens.size) {
             val t = tokens[i]
             if (t is Char && (t == '*' || t == '/')) {
@@ -329,7 +366,8 @@ class ScanResultActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         flowState = FlowState.IDLE
     }
 
-    // Arithmetic helpers
+    // ── Arithmetic helpers ─────────────────────────────────────────────────────
+
     private fun evaluateExpression(expr: String): Double? {
         return try {
             evalArithmetic(
@@ -343,7 +381,6 @@ class ScanResultActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val list   = mutableListOf<Any>()
         var i = 0
 
-        // Pass 1: * and /
         while (i < tokens.size) {
             val t = tokens[i]
             if (t is Double && list.isNotEmpty() && list.last() is Char) {
@@ -358,7 +395,6 @@ class ScanResultActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             list.add(t); i++
         }
 
-        // Pass 2: + and -
         var result = list[0] as Double
         var j = 1
         while (j < list.size - 1) {
@@ -391,7 +427,8 @@ class ScanResultActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         if (ans == floor(ans) && !ans.isInfinite()) ans.toInt().toString()
         else "%.2f".format(ans)
 
-    // UI wiring
+    // ── UI wiring ──────────────────────────────────────────────────────────────
+
     private fun bindViews() {
         btnBack            = findViewById(R.id.btnBack)
         tvRecognizedLabel  = findViewById(R.id.tvRecognizedLabel)
@@ -433,6 +470,7 @@ class ScanResultActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
         btnMic.setOnClickListener {
             tts.stop()
+            flowState = FlowState.WAITING_STT
             openMicForAnswer()
         }
 
@@ -452,23 +490,20 @@ class ScanResultActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
     }
 
-    // TTS convenience
+    // ── TTS helpers ────────────────────────────────────────────────────────────
+
     private fun speakText(text: String) {
         if (::tts.isInitialized)
             tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, null)
     }
 
-    /**
-     * Speaks [text] with the given [utteranceId] so the UtteranceProgressListener
-     * can chain the next step after it finishes.
-     */
     private fun speakThenListen(text: String, utteranceId: String) {
         if (::tts.isInitialized)
             tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
     }
 
+    // ── Loading / Processing state ─────────────────────────────────────────────
 
-    // Error/loading states (called by ScanActivity)
     fun showProcessingState() {
         btnScanAgain.isEnabled    = false
         btnReadAloud.isEnabled    = false
@@ -487,13 +522,16 @@ class ScanResultActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         btnReadSolution.isEnabled = true
     }
 
+    // ── Error handling ─────────────────────────────────────────────────────────
+
     fun showDetectionError() {
         tvSolutionContent.text = "Detection failed. Please retake the photo."
         speakText("Detection failed. Please go back and retake the photo.")
     }
 
     fun showUncertainError(expression: String) {
-        tvSolutionContent.text = "Unclear equation: $expression. Please retake the photo."
+        tvSolutionContent.text =
+            "Unclear equation: $expression. Please retake the photo."
         speakText(
             "The equation was unclear. Detected $expression but confidence is low. " +
                     "Please retake the photo or move closer."
@@ -505,7 +543,8 @@ class ScanResultActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         speakText("No equation symbols were detected. Please go back and try again.")
     }
 
-    // Permissions & bottom nav
+    // ── Permissions ────────────────────────────────────────────────────────────
+
     private fun hasMicPermission(): Boolean =
         ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
                 PackageManager.PERMISSION_GRANTED
@@ -516,6 +555,8 @@ class ScanResultActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                     "Please enable Microphone access for MIJI in Settings."
         )
     }
+
+    // ── Bottom navigation ──────────────────────────────────────────────────────
 
     private fun setupBottomNav() {
         val nav = findViewById<View>(R.id.bottomNav)
@@ -528,10 +569,12 @@ class ScanResultActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         )
     }
 
-    // Companion
+    // ── Companion ─────────────────────────────────────────────────────────────
+
     companion object {
         const val EXTRA_EQUATION_DISPLAY  = "extra_equation_display"
         const val EXTRA_EQUATION_PHONETIC = "extra_equation_phonetic"
         const val EXTRA_CONFIDENCE        = "extra_confidence"
+        private const val RETRY_DELAY_MS  = 2000L
     }
 }

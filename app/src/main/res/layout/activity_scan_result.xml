@@ -343,12 +343,12 @@
                     android:id="@+id/tvSolutionContent"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="note: ma p-populate lang &apos;to once &quot;read solution&quot; button is clicked."
-                    android:textSize="10sp"
-                    android:fontFamily="@font/inter_regular"
-                    android:textColor="#FFFFFF"
                     android:alpha="0.75"
-                    android:lineSpacingExtra="4dp" />
+                    android:fontFamily="@font/inter_regular"
+                    android:lineSpacingExtra="4dp"
+                    android:text="Submit your answer first"
+                    android:textColor="#FFFFFF"
+                    android:textSize="10sp" />
             </LinearLayout>
 
         </LinearLayout>

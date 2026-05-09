@@ -437,18 +437,20 @@ class ScanActivity : AppCompatActivity(){
                 }
 
                 runOnUiThread {
-                    val hasRejectedPrediction = output.predictions.any { !it.accepted }
+                    // AFTER:
+                    val rejectedCount = output.predictions.count { !it.accepted }
+                    val majorityRejected = rejectedCount > output.predictions.size / 2
 
                     if (output.detectedSymbolCount == 0 || output.expression.isBlank()) {
                         setAutoCaptureStatus("NO SYMBOLS FOUND")
                         updateSpeakingCard("No equation symbols were detected. Please try again.")
                         speakText("No equation symbols were detected. Please try again.")
-                    } else if (hasRejectedPrediction) {
+                    } else if (majorityRejected) {
                         setAutoCaptureStatus("UNCERTAIN")
                         updateSpeakingCard("The equation was unclear. Please retake the photo or move closer.")
                         speakText("The equation was unclear. Please retake the photo or move closer.")
 
-                        Log.d(TAG, "Recognition rejected because at least one symbol was not accepted.")
+                        Log.d(TAG, "Recognition rejected: $rejectedCount/${output.predictions.size} symbols uncertain.")
                         Log.d(TAG, "Rejected output labels: ${output.labels}")
                         Log.d(TAG, "Rejected expression: ${output.expression}")
                     } else {

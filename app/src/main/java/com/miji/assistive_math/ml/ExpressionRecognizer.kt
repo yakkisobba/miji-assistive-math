@@ -656,8 +656,8 @@ class ExpressionRecognizer(
 
         val filtered = currentRects.filter { rect ->
             val area = rect.width() * rect.height()
-            val minArea = imageWidth * imageHeight * 0.002
-            rect.width() >= 8 && rect.height() >= 8 && area >= minArea
+            val minArea = imageWidth * imageHeight * 0.001
+            rect.width() >= 6 && rect.height() >= 4 && area >= minArea
         }
 
         Log.d(TAG, "Merged symbol rects: ${filtered.size}")
@@ -672,11 +672,15 @@ class ExpressionRecognizer(
 
         val minWidth = minOf(a.width(), b.width()).coerceAtLeast(1)
         val minHeight = minOf(a.height(), b.height()).coerceAtLeast(1)
+        val maxHeight = maxOf(a.height(), b.height()).coerceAtLeast(1)
 
         val horizontalOverlapRatio = horizontalOverlap.toFloat() / minWidth.toFloat()
         val verticalOverlapRatio = verticalOverlap.toFloat() / minHeight.toFloat()
+        val heightRatio = minHeight.toFloat() / maxHeight.toFloat()
 
-        val closeSideBySide = horizontalGap <= closeGap && verticalOverlapRatio > 0.20f
+        // heightRatio guard: a minus sign is ~10-15px tall, a digit ~50px.
+        // ratio ≈ 0.2 → skip merge. Broken digit strokes have ratio ≥ 0.5 → still merge.
+        val closeSideBySide = horizontalGap <= closeGap && verticalOverlapRatio > 0.20f && heightRatio >= 0.3f
         val closeStacked = verticalGap <= closeGap && horizontalOverlapRatio > 0.20f
         val veryClose = horizontalGap <= 3 && verticalGap <= 3
 

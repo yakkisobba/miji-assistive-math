@@ -418,8 +418,7 @@ class ScanActivity : AppCompatActivity() {
                     return@execute
                 }
 
-                val recognizer = getExpressionRecognizer()
-                val output = recognizer.recognizeExpression(bitmap)
+                val output = getExpressionRecognizer().recognizeExpression(bitmap)
 
                 Log.d(TAG, "Detected symbols: ${output.detectedSymbolCount}")
                 Log.d(TAG, "Labels: ${output.labels}")

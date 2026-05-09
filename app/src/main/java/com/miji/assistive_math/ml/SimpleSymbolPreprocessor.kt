@@ -11,12 +11,12 @@ object SimpleSymbolPreprocessor {
     private const val TAG = "SimpleSymbolPreprocessor"
 
     fun bitmapToModelInput(symbolBitmap: Bitmap): FloatArray {
-        val prepared = prepareToMatchTraining(symbolBitmap)
+        val prepared = prepareToMatchTraining(symbolBitmap,48)
         return bitmapToFloatArray(prepared)
     }
 
     fun preprocessToDebug32(symbolBitmap: Bitmap): Bitmap {
-        return prepareToMatchTraining(symbolBitmap)
+        return prepareToMatchTraining(symbolBitmap,48)
     }
 
     /**
@@ -26,10 +26,10 @@ object SimpleSymbolPreprocessor {
      * NO binarization. NO stroke correction. NO tight crop.
      * The model was trained on smooth grayscale images — we must match that.
      */
-    private fun prepareToMatchTraining(bitmap: Bitmap): Bitmap {
+    private fun prepareToMatchTraining(bitmap: Bitmap,img_size: Int): Bitmap {
         // Remove padding since training images are 28x28 with no padding
         // Resize directly to 28x28 to match the training input size
-        val resized = Bitmap.createScaledBitmap(bitmap, 28, 28, true)
+        val resized = Bitmap.createScaledBitmap(bitmap, img_size, img_size, true)
 
         // Log pixel stats if needed
         logPixelStats(resized)

@@ -31,7 +31,7 @@ class SymbolClassifier(
     fun classify(inputArray: FloatArray): PredictionResult {
         val inputTensor = Tensor.fromBlob(
             inputArray,
-            longArrayOf(1, 1, 28, 28)
+            longArrayOf(1, 1, 48, 48)
         )
 
         val outputTensor = module.forward(IValue.from(inputTensor)).toTensor()

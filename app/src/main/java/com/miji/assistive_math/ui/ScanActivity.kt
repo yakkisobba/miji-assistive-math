@@ -37,8 +37,7 @@ import java.util.concurrent.Executors
 /**
  * SCAN SCREEN
  */
-class ScanActivity : AppCompatActivity() {
-
+class ScanActivity : AppCompatActivity(){
     private var isFlashOn = false
     private var camera: Camera? = null
     private var imageCapture: ImageCapture? = null

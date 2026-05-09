@@ -460,11 +460,14 @@ class ScanResultActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
         btnReadAloud.setOnClickListener {
             flowState = FlowState.READING_EQ
+
+            val textToRead = "The equation is: $equationPhonetic"
+
             tts.speak(
-                "Equation. $equationPhonetic",
+                textToRead,
                 TextToSpeech.QUEUE_FLUSH,
                 null,
-                "eq_read"
+                "manual_read_aloud"
             )
         }
 

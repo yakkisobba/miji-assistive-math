@@ -31,7 +31,7 @@ class ExpressionRecognizer(
         val grayscaleCrop = toGrayscale(scanCrop)
 
         // --- BINARY copy (used only for segmentation) ---
-        val binary = makeBlackOnWhite(scanCrop)
+        val binary = makeBlackOnWhite(grayscaleCrop)
         val cleanedBinary = removeBorderConnectedInk(binary)
         DebugImageSaver.saveBitmap(appContext, binary, "debug_binary_before_cleanup.png")
         DebugImageSaver.saveBitmap(appContext, cleanedBinary, "debug_binary_after_cleanup.png")
@@ -144,24 +144,17 @@ class ExpressionRecognizer(
     private fun toGrayscale(bitmap: Bitmap): Bitmap {
         val width = bitmap.width
         val height = bitmap.height
-        val total = width * height
 
-        val pixels = IntArray(total)
-        bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
+        val output = createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(output)
+        val paint = Paint()
+        val colorMatrix = ColorMatrix()
+        colorMatrix.setSaturation(0.0f);
 
-        val outputPixels = IntArray(total)
+        val colorFilter = ColorMatrixColorFilter(colorMatrix)
 
-        for (i in pixels.indices) {
-            val pixel = pixels[i]
-            val r = Color.red(pixel)
-            val g = Color.green(pixel)
-            val b = Color.blue(pixel)
-            val gray = ((0.299 * r) + (0.587 * g) + (0.114 * b)).toInt().coerceIn(0, 255)
-            outputPixels[i] = Color.rgb(gray, gray, gray)
-        }
-
-        val output = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        output.setPixels(outputPixels, 0, width, 0, 0, width, height)
+        paint.colorFilter = colorFilter
+        canvas.drawBitmap(bitmap,0F,0F,paint)
         return output
     }
 
@@ -243,22 +236,27 @@ class ExpressionRecognizer(
 
     // ── Binarization ───────────────────────────────────────────────────────────
 
-    private fun makeBlackOnWhite(bitmap: Bitmap): Bitmap {
-        val width = bitmap.width
-        val height = bitmap.height
+    private fun makeBlackOnWhite(grayscale: Bitmap): Bitmap {
+        val width = grayscale.width
+        val height = grayscale.height
 
         val pixels = IntArray(width * height)
-        bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
+        grayscale.getPixels(pixels, 0, width, 0, 0, width, height)
 
         val grayValues = IntArray(width * height)
 
+        var min = 0
+        var max = 255
+
+        for (i in pixels) {
+            min = min(min,i)
+            max = max(max,i)
+        }
+
         for (i in pixels.indices) {
             val pixel = pixels[i]
-            val r = Color.red(pixel)
-            val g = Color.green(pixel)
-            val b = Color.blue(pixel)
-            val gray = ((0.299 * r) + (0.587 * g) + (0.114 * b)).toInt()
-            grayValues[i] = gray.coerceIn(0, 255)
+            //Normalize pixel values
+            grayValues[i] = (Color.red(pixel) - min) / (max-min)
         }
 
         val otsuThreshold = calculateOtsuThreshold(grayValues)
@@ -283,10 +281,10 @@ class ExpressionRecognizer(
 
         Log.d(TAG, "Binary darkCount=$darkCount, lightCount=$lightCount")
 
-        val output = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val output = createBitmap(width, height)
         output.setPixels(outputPixels, 0, width, 0, 0, width, height)
 
-        return ensureBlackSymbolsWhiteBackground(output)
+        return ensureBlackSymbolsWhiteBackground(output,darkCount,lightCount)
     }
 
     private fun calculateOtsuThreshold(grayValues: IntArray): Int {
@@ -330,19 +328,12 @@ class ExpressionRecognizer(
         return threshold
     }
 
-    private fun ensureBlackSymbolsWhiteBackground(bitmap: Bitmap): Bitmap {
+    private fun ensureBlackSymbolsWhiteBackground(bitmap: Bitmap,darkCount:Int, lightCount:Int): Bitmap {
         val width = bitmap.width
         val height = bitmap.height
 
         val pixels = IntArray(width * height)
         bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
-
-        var darkCount = 0
-        var lightCount = 0
-
-        for (pixel in pixels) {
-            if (Color.red(pixel) < 128) darkCount++ else lightCount++
-        }
 
         if (darkCount <= lightCount) return bitmap
 

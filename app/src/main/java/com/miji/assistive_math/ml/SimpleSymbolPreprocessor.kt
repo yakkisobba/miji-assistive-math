@@ -5,18 +5,19 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.util.Log
+import androidx.core.graphics.scale
 
 object SimpleSymbolPreprocessor {
 
     private const val TAG = "SimpleSymbolPreprocessor"
 
-    fun bitmapToModelInput(symbolBitmap: Bitmap): FloatArray {
-        val prepared = prepareToMatchTraining(symbolBitmap,48)
-        return bitmapToFloatArray(prepared)
+    fun bitmapToModelInput(symbolBitmap: Bitmap, img_size: Int): FloatArray {
+        val prepared = prepareToMatchTraining(symbolBitmap,img_size)
+        return bitmapToFloatArray(prepared,img_size)
     }
 
-    fun preprocessToDebug32(symbolBitmap: Bitmap): Bitmap {
-        return prepareToMatchTraining(symbolBitmap,48)
+    fun preprocessToDebug32(symbolBitmap: Bitmap, img_size : Int): Bitmap {
+        return prepareToMatchTraining(symbolBitmap,img_size)
     }
 
     /**
@@ -29,7 +30,7 @@ object SimpleSymbolPreprocessor {
     private fun prepareToMatchTraining(bitmap: Bitmap,img_size: Int): Bitmap {
         // Remove padding since training images are 28x28 with no padding
         // Resize directly to 28x28 to match the training input size
-        val resized = Bitmap.createScaledBitmap(bitmap, img_size, img_size, true)
+        val resized = bitmap.scale(img_size, img_size)
 
         // Log pixel stats if needed
         logPixelStats(resized)
@@ -37,12 +38,12 @@ object SimpleSymbolPreprocessor {
         return resized
     }
 
-    private fun bitmapToFloatArray(bitmap: Bitmap): FloatArray {
-        val input = FloatArray(1 * 1 * 28 * 28)
+    private fun bitmapToFloatArray(bitmap: Bitmap, size: Int): FloatArray {
+        val input = FloatArray(1 * 1 * size * size)
         var index = 0
 
-        for (y in 0 until 28) {
-            for (x in 0 until 28) {
+        for (y in 0 until size) {
+            for (x in 0 until size) {
                 val pixel = bitmap.getPixel(x, y)
                 val r = Color.red(pixel)
                 val g = Color.green(pixel)
@@ -66,6 +67,6 @@ object SimpleSymbolPreprocessor {
         }
 
         val lightCount = bitmap.width * bitmap.height - darkCount
-        Log.d(TAG, "28x28 stats: dark=$darkCount, light=$lightCount")
+        Log.d(TAG, "48x48 stats: dark=$darkCount, light=$lightCount")
     }
 }

@@ -2,10 +2,18 @@ package com.miji.assistive_math.ml
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.ColorMatrix
+import android.graphics.ColorMatrixColorFilter
+import android.graphics.Paint
 import android.graphics.Rect
 import android.util.Log
 import java.util.ArrayDeque
+import androidx.core.graphics.createBitmap
+import androidx.core.graphics.scale
+import kotlin.math.pow
+import kotlin.math.sqrt
 
 class ExpressionRecognizer(
     context: Context
@@ -17,11 +25,12 @@ class ExpressionRecognizer(
         Log.d(TAG, "Input bitmap: width=${bitmap.width}, height=${bitmap.height}")
 
         // Crop the center area where the equation should be.
-        val scanCrop = cropCenterArea(
+        var scanCrop = cropCenterArea(
             bitmap = bitmap,
             widthRatio = 0.92f,
             heightRatio = 0.68f
         )
+        scanCrop = scanCrop.scale(2048,2048);
 
         Log.d(TAG, "Scan crop: width=${scanCrop.width}, height=${scanCrop.height}")
 
@@ -33,9 +42,9 @@ class ExpressionRecognizer(
         // --- BINARY copy (used only for segmentation) ---
         val binary = makeBlackOnWhite(grayscaleCrop)
         val cleanedBinary = removeBorderConnectedInk(binary)
-        DebugImageSaver.saveBitmap(appContext, binary, "debug_binary_before_cleanup.png")
-        DebugImageSaver.saveBitmap(appContext, cleanedBinary, "debug_binary_after_cleanup.png")
-        Log.d(TAG, "Saved debug binary images for inspection")
+//        DebugImageSaver.saveBitmap(appContext, binary, "debug_binary_before_cleanup.png")
+//        DebugImageSaver.saveBitmap(appContext, cleanedBinary, "debug_binary_after_cleanup.png")
+//        Log.d(TAG, "Saved debug binary images for inspection")
         // Crop tightly around the actual expression (binary used for finding ink bounds).
         val expressionBinary = cropToInkBoundingBox(
             bitmap = cleanedBinary,
@@ -83,6 +92,12 @@ class ExpressionRecognizer(
                 padding = 14
             )
 
+            val symbolBitmapBW = cropBitmapWithPadding(
+                bitmap = expressionBinary,
+                rect = rect,
+                padding = 14
+            )
+
             Log.d(
                 TAG,
                 "Symbol crop ${index + 1}: " +
@@ -98,16 +113,19 @@ class ExpressionRecognizer(
             )
 
             // Save grayscale 32x32 — this is what the model actually sees.
-            val debug32 = SimpleSymbolPreprocessor.preprocessToDebug32(symbolBitmapGrayscale)
-            DebugImageSaver.saveBitmap(
-                context = appContext,
-                bitmap = debug32,
-                fileName = "symbol_${index + 1}_model_32.png"
-            )
+//            val debug32 = SimpleSymbolPreprocessor.preprocessToDebug32(symbolBitmapGrayscale)
+//            DebugImageSaver.saveBitmap(
+//                context = appContext,
+//                bitmap = debug32,
+//                fileName = "symbol_${index + 1}_model_32.png"
+//            )
 
-            // Classify using grayscale crop.
-            val inputArray = SimpleSymbolPreprocessor.bitmapToModelInput(symbolBitmapGrayscale)
-            val prediction = classifier.classify(inputArray)
+            try {// Classify using grayscale crop.
+            } catch (e: Exception) {
+                TODO("Not yet implemented")
+            }
+            val inputArray = SimpleSymbolPreprocessor.bitmapToModelInput(symbolBitmapBW,48)
+            val prediction = classifier.classify(inputArray,48)
 
             predictions.add(prediction)
 
@@ -242,56 +260,62 @@ class ExpressionRecognizer(
 
         val pixels = IntArray(width * height)
         grayscale.getPixels(pixels, 0, width, 0, 0, width, height)
+        val pixelGrays = pixels.map { Color.red(it) }.toIntArray()
 
-        val grayValues = IntArray(width * height)
+        //DSCE + Otsu based on Mustafa et al. (https://doi.org/10.32604/cmc.2022.019801)
+        val meanLocal = FloatArray(width * height)
+        val stdLocal = FloatArray(width * height)
+        var meanGlobal = 0f
+        var stdGlobal = 0f
 
-        var min = 0
-        var max = 255
+        //First calculate means and std for every 3x3 window
+        for (y in 0 until height){
+            val y1 = y * height
+            val y0 = if (y > 1) (y-1) else y1
+            val y2 = if (y < height -1) (y+1) * height else y1
+            for (x in 0 until width){
+                val x1 = x
+                val x0 = if (x > 1) (x-1) else x1
+                val x2 = if (x < width-1) (x+1)  else x1
+                meanGlobal += pixelGrays[x1+y1]
+                val mean = (
+                                pixelGrays[x0+y0] + pixelGrays[x1+y0] + pixelGrays[x2+y0]+
+                                pixelGrays[x0+y1] + pixelGrays[x1+y1] + pixelGrays[x2+y1]+
+                                pixelGrays[x0+y2] + pixelGrays[x1+y2] + pixelGrays[x2+y2]
+                        ).toFloat()/9
+                val std = sqrt((
+                    (mean - pixelGrays[x0+y0]).pow(2) + (mean - pixelGrays[x1+y0]).pow(2) + (mean - pixelGrays[x2+y0]).pow(2)+
+                    (mean - pixelGrays[x0+y1]).pow(2) + (mean - pixelGrays[x1+y1]).pow(2) + (mean - pixelGrays[x2+y1]).pow(2)+
+                    (mean - pixelGrays[x0+y2]).pow(2) + (mean - pixelGrays[x1+y2]).pow(2) + (mean - pixelGrays[x2+y2]).pow(2)
+                    )/9
+                )
 
-        for (i in pixels) {
-            min = min(min,i)
-            max = max(max,i)
-        }
-
-        for (i in pixels.indices) {
-            val pixel = pixels[i]
-            //Normalize pixel values
-            grayValues[i] = (Color.red(pixel) - min) / (max-min)
-        }
-
-        val otsuThreshold = calculateOtsuThreshold(grayValues)
-        val finalThreshold = (otsuThreshold + 10).coerceIn(115, 150)
-
-        Log.d(TAG, "Otsu threshold=$otsuThreshold, final threshold=$finalThreshold")
-
-        val outputPixels = IntArray(width * height)
-        var darkCount = 0
-        var lightCount = 0
-
-        for (i in grayValues.indices) {
-            val gray = grayValues[i]
-            if (gray < finalThreshold) {
-                outputPixels[i] = Color.BLACK
-                darkCount++
-            } else {
-                outputPixels[i] = Color.WHITE
-                lightCount++
+                meanLocal[x1+y1] = mean
+                stdLocal[x1+y1] = std
             }
         }
 
-        Log.d(TAG, "Binary darkCount=$darkCount, lightCount=$lightCount")
+        meanGlobal /= width*height
+        for (p in pixelGrays){
+            stdGlobal += (meanGlobal - p).pow(2)
+        }
 
-        val output = createBitmap(width, height)
-        output.setPixels(outputPixels, 0, width, 0, 0, width, height)
+        stdGlobal = sqrt(stdGlobal/9)
 
-        return ensureBlackSymbolsWhiteBackground(output,darkCount,lightCount)
-    }
-
-    private fun calculateOtsuThreshold(grayValues: IntArray): Int {
+        //Regular otsu method
         val histogram = IntArray(256)
-        for (value in grayValues) histogram[value.coerceIn(0, 255)]++
 
-        val total = grayValues.size
+        for (i in 0 until width*height) {
+            if (stdLocal[i] < stdGlobal && meanLocal[i] > meanGlobal) {
+                histogram[meanGlobal.toInt().coerceIn(0,255)]++
+            } else {
+                histogram[pixelGrays[i]]++
+            }
+        }
+
+//        for (value in pixelGrays) histogram[value.coerceIn(0, 255)]++
+
+        val total = width*height
         var totalSum = 0L
         for (i in 0..255) totalSum += i.toLong() * histogram[i].toLong()
 
@@ -325,30 +349,20 @@ class ExpressionRecognizer(
             }
         }
 
-        return threshold
-    }
-
-    private fun ensureBlackSymbolsWhiteBackground(bitmap: Bitmap,darkCount:Int, lightCount:Int): Bitmap {
-        val width = bitmap.width
-        val height = bitmap.height
-
-        val pixels = IntArray(width * height)
-        bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
-
-        if (darkCount <= lightCount) return bitmap
-
-        Log.d(TAG, "Image appears inverted. Inverting to black-on-white.")
-
-        val invertedPixels = IntArray(width * height)
-        for (i in pixels.indices) {
-            val gray = Color.red(pixels[i])
-            val inv = 255 - gray
-            invertedPixels[i] = Color.rgb(inv, inv, inv)
+        val outputPixels = IntArray(width*height)
+        for (i in outputPixels.indices) {
+            val gray = pixelGrays[i]
+            if (gray < threshold) {
+                outputPixels[i] = Color.BLACK
+            } else {
+                outputPixels[i] = Color.WHITE
+            }
         }
 
-        val inverted = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        inverted.setPixels(invertedPixels, 0, width, 0, 0, width, height)
-        return inverted
+        val output = createBitmap(width, height)
+        output.setPixels(outputPixels, 0, width, 0, 0, width, height)
+
+        return output
     }
 
     // ── Border ink removal ─────────────────────────────────────────────────────

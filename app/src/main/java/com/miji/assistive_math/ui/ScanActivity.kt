@@ -366,8 +366,6 @@ class ScanActivity : AppCompatActivity(){
             object : ImageCapture.OnImageSavedCallback {
                 override fun onImageSaved(output: ImageCapture.OutputFileResults) {
                     val uri = Uri.fromFile(photoFile)
-                    Log.d(TAG, "Photo saved: $uri")
-                    isCapturing = false
                     setAutoCaptureStatus("PROCESSING…")
                     updateSpeakingCard("Processing equation…")
                     speakText("Processing equation.")
@@ -410,6 +408,7 @@ class ScanActivity : AppCompatActivity(){
 
                 if (bitmap == null) {
                     runOnUiThread {
+                        isCapturing = false
                         setAutoCaptureStatus("FAILED")
                         updateSpeakingCard("Could not read the image. Please try again.")
                         speakText("Could not read the image. Please try again.")
@@ -436,22 +435,19 @@ class ScanActivity : AppCompatActivity(){
                 }
 
                 runOnUiThread {
-                    // AFTER:
                     val rejectedCount = output.predictions.count { !it.accepted }
                     val majorityRejected = rejectedCount > output.predictions.size / 2
 
                     if (output.detectedSymbolCount == 0 || output.expression.isBlank()) {
+                        isCapturing = false  // ← reset only on failure
                         setAutoCaptureStatus("NO SYMBOLS FOUND")
                         updateSpeakingCard("No equation symbols were detected. Please try again.")
                         speakText("No equation symbols were detected. Please try again.")
                     } else if (majorityRejected) {
+                        isCapturing = false  // ← reset only on failure
                         setAutoCaptureStatus("UNCERTAIN")
                         updateSpeakingCard("The equation was unclear. Please retake the photo or move closer.")
                         speakText("The equation was unclear. Please retake the photo or move closer.")
-
-                        Log.d(TAG, "Recognition rejected: $rejectedCount/${output.predictions.size} symbols uncertain.")
-                        Log.d(TAG, "Rejected output labels: ${output.labels}")
-                        Log.d(TAG, "Rejected expression: ${output.expression}")
                     } else {
                         setAutoCaptureStatus("DONE")
                         updateSpeakingCard("Equation recognized.")
@@ -463,6 +459,7 @@ class ScanActivity : AppCompatActivity(){
             } catch (e: Exception) {
                 Log.e(TAG, "Processing failed", e)
                 runOnUiThread {
+                    isCapturing = false
                     setAutoCaptureStatus("FAILED")
                     updateSpeakingCard("Processing failed. Please try again.")
                     speakText("Processing failed. Please try again.")

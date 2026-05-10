@@ -12,6 +12,7 @@ import android.util.Log
 import java.util.ArrayDeque
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.scale
+import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.sqrt
 
@@ -30,7 +31,7 @@ class ExpressionRecognizer(
             widthRatio = 0.92f,
             heightRatio = 0.68f
         )
-        scanCrop = scanCrop.scale(2048,2048);
+        scanCrop = scanCrop.scale(min(scanCrop.width,512),min(scanCrop.height,512));
 
         Log.d(TAG, "Scan crop: width=${scanCrop.width}, height=${scanCrop.height}")
 
@@ -262,104 +263,68 @@ class ExpressionRecognizer(
         grayscale.getPixels(pixels, 0, width, 0, 0, width, height)
         val pixelGrays = pixels.map { Color.red(it) }.toIntArray()
 
-        //DSCE + Otsu based on Mustafa et al. (https://doi.org/10.32604/cmc.2022.019801)
-        val meanLocal = FloatArray(width * height)
-        val stdLocal = FloatArray(width * height)
-        var meanGlobal = 0f
-        var stdGlobal = 0f
+        //DSCE + Nicks Method based on Mustafa et al. (https://doi.org/10.32604/cmc.2022.019801)
+        val meanLocalArr = FloatArray(width * height)
+        val stdLocalArr = FloatArray(width * height)
+        var sumGlobal = 0.0f
+        var sumSqrGlobal = 0.0f
 
         //First calculate means and std for every 3x3 window
         for (y in 0 until height){
-            val y1 = y * height
-            val y0 = if (y > 1) (y-1) else y1
-            val y2 = if (y < height -1) (y+1) * height else y1
             for (x in 0 until width){
-                val x1 = x
-                val x0 = if (x > 1) (x-1) else x1
-                val x2 = if (x < width-1) (x+1)  else x1
-                meanGlobal += pixelGrays[x1+y1]
-                val mean = (
-                                pixelGrays[x0+y0] + pixelGrays[x1+y0] + pixelGrays[x2+y0]+
-                                pixelGrays[x0+y1] + pixelGrays[x1+y1] + pixelGrays[x2+y1]+
-                                pixelGrays[x0+y2] + pixelGrays[x1+y2] + pixelGrays[x2+y2]
-                        ).toFloat()/9
-                val std = sqrt((
-                    (mean - pixelGrays[x0+y0]).pow(2) + (mean - pixelGrays[x1+y0]).pow(2) + (mean - pixelGrays[x2+y0]).pow(2)+
-                    (mean - pixelGrays[x0+y1]).pow(2) + (mean - pixelGrays[x1+y1]).pow(2) + (mean - pixelGrays[x2+y1]).pow(2)+
-                    (mean - pixelGrays[x0+y2]).pow(2) + (mean - pixelGrays[x1+y2]).pow(2) + (mean - pixelGrays[x2+y2]).pow(2)
-                    )/9
-                )
-
-                meanLocal[x1+y1] = mean
-                stdLocal[x1+y1] = std
+                var sumLocal = 0.0f
+                var sumSqrLocal = 0.0f
+                for(h in -1 until 1){
+                    for(w in -1 until 1){
+                        //Calculate 3x3
+                        val tx = (x + w).coerceIn(0,width-1)
+                        val ty = (y + h).coerceIn(0,height-1)
+                        val pixel = pixelGrays[tx+ty]
+                        sumLocal += pixel
+                        sumSqrLocal += pixel.toFloat().pow(2)
+                    }
+                }
+                val mean = sumLocal / 9
+                meanLocalArr[x + y*width] = mean
+                stdLocalArr[x + y*width] = sqrt((sumSqrLocal - 2*mean*sumLocal)/9+mean.pow(2))
+                sumGlobal += pixelGrays[x+y*width]
+                sumSqrGlobal += pixelGrays[x+y*width].toFloat().pow(2)
             }
         }
 
-        meanGlobal /= width*height
-        for (p in pixelGrays){
-            stdGlobal += (meanGlobal - p).pow(2)
+        val meanGlobal = sumGlobal / width*height
+        val stdGlobal = sqrt((sumSqrGlobal - 2*meanGlobal*sumGlobal)/9+meanGlobal.pow(2))
+
+        for (i in pixelGrays.indices){
+            if (stdLocalArr[i] > stdGlobal && meanLocalArr[i] > meanGlobal)
+                pixelGrays[i] = meanGlobal.toInt()
         }
-
-        stdGlobal = sqrt(stdGlobal/9)
-
-        //Regular otsu method
-        val histogram = IntArray(256)
-
-        for (i in 0 until width*height) {
-            if (stdLocal[i] < stdGlobal && meanLocal[i] > meanGlobal) {
-                histogram[meanGlobal.toInt().coerceIn(0,255)]++
-            } else {
-                histogram[pixelGrays[i]]++
-            }
-        }
-
-//        for (value in pixelGrays) histogram[value.coerceIn(0, 255)]++
-
-        val total = width*height
-        var totalSum = 0L
-        for (i in 0..255) totalSum += i.toLong() * histogram[i].toLong()
-
-        var backgroundSum = 0L
-        var backgroundWeight = 0
-        var maxVariance = 0.0
-        var threshold = 128
-
-        for (i in 0..255) {
-            backgroundWeight += histogram[i]
-            if (backgroundWeight == 0) continue
-
-            val foregroundWeight = total - backgroundWeight
-            if (foregroundWeight == 0) break
-
-            backgroundSum += i.toLong() * histogram[i].toLong()
-
-            val backgroundMean = backgroundSum.toDouble() / backgroundWeight.toDouble()
-            val foregroundMean =
-                (totalSum - backgroundSum).toDouble() / foregroundWeight.toDouble()
-
-            val betweenClassVariance =
-                backgroundWeight.toDouble() *
-                        foregroundWeight.toDouble() *
-                        (backgroundMean - foregroundMean) *
-                        (backgroundMean - foregroundMean)
-
-            if (betweenClassVariance > maxVariance) {
-                maxVariance = betweenClassVariance
-                threshold = i
-            }
-        }
+        val bitmapTest = createBitmap(width,height)
+        bitmapTest.setPixels(pixelGrays,0,width,0,0,width,height)
 
         val outputPixels = IntArray(width*height)
-        for (i in outputPixels.indices) {
-            val gray = pixelGrays[i]
-            if (gray < threshold) {
-                outputPixels[i] = Color.BLACK
-            } else {
-                outputPixels[i] = Color.WHITE
+
+        for (y in 0 until height){
+            for (x in 0 until width){
+                var mean = 0.0
+                var sqrs = 0.0
+                val pos = x+y*width
+                for(h in -7 until 7){
+                    for(w in -7 until 7){
+                        val tx = (x + w).coerceIn(0,width-1)
+                        val ty = (y + h).coerceIn(0,height-1)
+                        mean += pixelGrays[tx+ty*width]
+                        sqrs += pixelGrays[tx+ty*width].toFloat().pow(2)
+                    }
+                }
+                sqrs /= 15*15
+                mean /= 15*15
+                val threshold = mean + -0.2 * sqrt((sqrs - mean.pow(2))/(15*15))
+                outputPixels[pos] = if (pixelGrays[pos] < threshold) Color.BLACK else Color.WHITE
             }
         }
 
-        val output = createBitmap(width, height)
+        val output = createBitmap(width,height, Bitmap.Config.ARGB_8888)
         output.setPixels(outputPixels, 0, width, 0, 0, width, height)
 
         return output
@@ -661,8 +626,8 @@ class ExpressionRecognizer(
 
         val filtered = currentRects.filter { rect ->
             val area = rect.width() * rect.height()
-            val minArea = imageWidth * imageHeight * 0.001
-            rect.width() >= 6 && rect.height() >= 4 && area >= minArea
+            val minArea = imageWidth * imageHeight * 0.002
+            rect.width() >= 8 && rect.height() >= 8 && area >= minArea
         }
 
         Log.d(TAG, "Merged symbol rects: ${filtered.size}")
@@ -677,15 +642,11 @@ class ExpressionRecognizer(
 
         val minWidth = minOf(a.width(), b.width()).coerceAtLeast(1)
         val minHeight = minOf(a.height(), b.height()).coerceAtLeast(1)
-        val maxHeight = maxOf(a.height(), b.height()).coerceAtLeast(1)
 
         val horizontalOverlapRatio = horizontalOverlap.toFloat() / minWidth.toFloat()
         val verticalOverlapRatio = verticalOverlap.toFloat() / minHeight.toFloat()
-        val heightRatio = minHeight.toFloat() / maxHeight.toFloat()
 
-        // heightRatio guard: a minus sign is ~10-15px tall, a digit ~50px.
-        // ratio ≈ 0.2 → skip merge. Broken digit strokes have ratio ≥ 0.5 → still merge.
-        val closeSideBySide = horizontalGap <= closeGap && verticalOverlapRatio > 0.20f && heightRatio >= 0.3f
+        val closeSideBySide = horizontalGap <= closeGap && verticalOverlapRatio > 0.20f
         val closeStacked = verticalGap <= closeGap && horizontalOverlapRatio > 0.20f
         val veryClose = horizontalGap <= 3 && verticalGap <= 3
 

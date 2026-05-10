@@ -28,10 +28,10 @@ class SymbolClassifier(
         Log.d("SymbolClassifier", "PyTorch Mobile model loaded successfully")
     }
 
-    fun classify(inputArray: FloatArray): PredictionResult {
+    fun classify(inputArray: FloatArray,img_size: Long): PredictionResult {
         val inputTensor = Tensor.fromBlob(
             inputArray,
-            longArrayOf(1, 1, 28, 28)
+            longArrayOf(1, 1, img_size, img_size)
         )
 
         val outputTensor = module.forward(IValue.from(inputTensor)).toTensor()

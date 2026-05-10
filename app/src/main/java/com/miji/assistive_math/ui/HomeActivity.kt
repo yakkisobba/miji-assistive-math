@@ -32,38 +32,19 @@ class HomeActivity : AppCompatActivity() {
 
     // ── Module list ────────────────────────────────────────────────────────────
 
+    private val modules = listOf(
+        ModuleConfig(R.id.moduleAddition,       R.string.module_addition,       R.drawable.ic_plus,     LearnModuleActivity.MODULE_ADDITION),
+        ModuleConfig(R.id.moduleSubtraction,    R.string.module_subtraction,    R.drawable.ic_minus,    LearnModuleActivity.MODULE_SUBTRACTION),
+        ModuleConfig(R.id.moduleMultiplication, R.string.module_multiplication, R.drawable.ic_multiply, LearnModuleActivity.MODULE_MULTIPLICATION),
+        ModuleConfig(R.id.moduleDivision,       R.string.module_division,       R.drawable.ic_divide,   LearnModuleActivity.MODULE_DIVISION),
+        ModuleConfig(R.id.moduleMixed,          R.string.module_mixed,          R.drawable.ic_mixed,    null)
+    )
+
     private data class ModuleConfig(
         val viewId: Int,
         val labelRes: Int,
-        val iconRes: Int
-    )
-
-    private val modules = listOf(
-        ModuleConfig(
-            viewId   = R.id.moduleAddition,
-            labelRes = R.string.module_addition,
-            iconRes  = R.drawable.ic_plus
-        ),
-        ModuleConfig(
-            viewId   = R.id.moduleSubtraction,
-            labelRes = R.string.module_subtraction,
-            iconRes  = R.drawable.ic_minus
-        ),
-        ModuleConfig(
-            viewId   = R.id.moduleMultiplication,
-            labelRes = R.string.module_multiplication,
-            iconRes  = R.drawable.ic_multiply
-        ),
-        ModuleConfig(
-            viewId   = R.id.moduleDivision,
-            labelRes = R.string.module_division,
-            iconRes  = R.drawable.ic_divide
-        ),
-        ModuleConfig(
-            viewId   = R.id.moduleMixed,
-            labelRes = R.string.module_mixed,
-            iconRes  = R.drawable.ic_mixed
-        )
+        val iconRes: Int,
+        val moduleType: String?   // null = not yet implemented (Mixed)
     )
 
     private fun setupModules() {
@@ -72,10 +53,10 @@ class HomeActivity : AppCompatActivity() {
             row.findViewById<ImageView>(R.id.ivModuleIcon).setImageResource(module.iconRes)
             row.findViewById<TextView>(R.id.tvModuleName).setText(module.labelRes)
             row.setOnClickListener {
-                // TODO: launch ModuleActivity with module type as extra
-                // val intent = Intent(this, ModuleActivity::class.java)
-                // intent.putExtra("module_type", module.labelRes)
-                // startActivity(intent)
+                val type = module.moduleType ?: return@setOnClickListener
+                val intent = Intent(this, LearnModuleActivity::class.java)
+                intent.putExtra(LearnModuleActivity.EXTRA_MODULE_TYPE, type)
+                startActivity(intent)
             }
         }
     }

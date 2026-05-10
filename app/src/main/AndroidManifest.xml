@@ -32,6 +32,7 @@
         <activity android:name=".ui.ScanActivity" android:exported="false" />
         <activity android:name=".ui.ScanResultActivity" android:exported="false" />
         <activity android:name=".ui.ProfileActivity" android:exported="false" />
+        <activity android:name=".ui.LearnModuleActivity" />
     </application>
 
 </manifest>

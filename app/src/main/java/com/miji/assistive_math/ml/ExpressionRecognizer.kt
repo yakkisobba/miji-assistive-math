@@ -9,7 +9,9 @@ import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
 import android.graphics.Rect
+import android.os.Build
 import android.util.Log
+import androidx.annotation.RequiresApi
 import java.util.ArrayDeque
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.scale
@@ -55,7 +57,7 @@ class ExpressionRecognizer(
             heightRatio = 0.68f
         )
         val ratio = scanCrop.width / scanCrop.height.toFloat()
-        val maxWidth = 1280
+        val maxWidth = 720
         scanCrop = scanCrop.scale(maxWidth,(maxWidth*(1/ratio)).toInt())
 
         Log.d(TAG, "Scan crop: width=${scanCrop.width}, height=${scanCrop.height}")
@@ -74,15 +76,15 @@ class ExpressionRecognizer(
         // Crop tightly around the actual expression (binary used for finding ink bounds).
         val expressionBinary = cropToInkBoundingBox(
             bitmap = cleanedBinary,
-            padding = 25
+            padding = 4
         )
 
-        // Apply the same crop region to the grayscale image so coordinates match.
-        val expressionGrayscale = cropToInkBoundingBoxGrayscale(
-            grayscale = grayscaleCrop,
-            binary = cleanedBinary,
-            padding = 25
-        )
+//        // Apply the same crop region to the grayscale image so coordinates match.
+//        val expressionGrayscale = cropToInkBoundingBoxGrayscale(
+//            grayscale = grayscaleCrop,
+//            binary = cleanedBinary,
+//            padding = 25
+//        )
 
         Log.d(
             TAG,
@@ -95,28 +97,11 @@ class ExpressionRecognizer(
         Log.d(TAG, "Symbol rects count: ${symbolRects.size}")
         symbolRects.forEachIndexed { i, rect ->
             Log.d(TAG, "Symbol rect $i: $rect")
-            val cropDebug = cropBitmapWithPadding(expressionBinary, rect, 10)
-            DebugImageSaver.saveBitmap(appContext, cropDebug, "debug_symbol_rect_${i}.png")
         }
 
         val predictions = mutableListOf<PredictionResult>()
 
         for ((index, rect) in symbolRects.withIndex()) {
-
-            // Original crop for debug — from binary (visual reference)
-            val symbolBitmapDebug = cropBitmapWithPadding(
-                bitmap = expressionBinary,
-                rect = rect,
-                padding = 14
-            )
-
-            // Grayscale crop — this is what actually goes into the model.
-            // Matches training data distribution (smooth gray, not pure black/white).
-            val symbolBitmapGrayscale = cropBitmapWithPadding(
-                bitmap = expressionGrayscale,
-                rect = rect,
-                padding = 14
-            )
 
             val symbolBitmapBW = cropBitmapWithPadding(
                 bitmap = expressionBinary,
@@ -124,32 +109,6 @@ class ExpressionRecognizer(
                 padding = 14
             )
 
-            Log.d(
-                TAG,
-                "Symbol crop ${index + 1}: " +
-                        "width=${symbolBitmapDebug.width}, " +
-                        "height=${symbolBitmapDebug.height}, rect=$rect"
-            )
-
-            // Save binary version for visual debugging.
-            DebugImageSaver.saveBitmap(
-                context = appContext,
-                bitmap = symbolBitmapDebug,
-                fileName = "symbol_${index + 1}_original.png"
-            )
-
-            // Save grayscale 32x32 — this is what the model actually sees.
-//            val debug32 = SimpleSymbolPreprocessor.preprocessToDebug32(symbolBitmapGrayscale)
-//            DebugImageSaver.saveBitmap(
-//                context = appContext,
-//                bitmap = debug32,
-//                fileName = "symbol_${index + 1}_model_32.png"
-//            )
-
-            try {// Classify using grayscale crop.
-            } catch (e: Exception) {
-                TODO("Not yet implemented")
-            }
             val inputArray = SimpleSymbolPreprocessor.bitmapToModelInput(symbolBitmapBW,48)
             val prediction = classifier.classify(inputArray,48)
 
@@ -289,17 +248,15 @@ class ExpressionRecognizer(
         val pixelGrays = pixels.map { Color.red(it) }.toIntArray()
 
         //DSCE + Nicks Method based on Mustafa et al. (https://doi.org/10.32604/cmc.2022.019801)
-        val meanLocalArr = FloatArray(width * height)
-        val stdLocalArr = FloatArray(width * height)
-        var sumGlobal = 0.0f
-        var sumSqrGlobal = 0.0f
+        val meanLocalArr = DoubleArray(width * height)
+        val stdLocalArr = DoubleArray(width * height)
+        var sumGlobal = 0.0
+        var sumSqrGlobal = 0.0
+
+        val numCoroutines = 40
+        val blockSize = ceil(width*height / numCoroutines.toFloat()).toInt()
 
 
-
-        val numCoroutines = 80
-        val blockSize = (width*height / numCoroutines.toFloat()).toInt()
-
-        var meanGlobal = 0.0f
         runBlocking(Dispatchers.Default) {
             val mutex = Mutex()
             val deferreds = mutableListOf<Job>()
@@ -307,17 +264,17 @@ class ExpressionRecognizer(
             for (i in 0 until numCoroutines){
                 deferreds.add(
                     async {
-                        for (index in i*blockSize until (i+1)*blockSize ) {
+                        for (index in i*blockSize until (min(((i+1)*blockSize),width*height)) ) {
                             val x = index % width
                             val y = index / width
-                            var sumLocal = 0.0f
-                            var sumSqrLocal = 0.0f
-                            for (h in -1 until 1) {
-                                for (w in -1 until 1) {
+                            var sumLocal = 0.0
+                            var sumSqrLocal = 0.0
+                            for (h in -1..1) {
+                                for (w in -1..1) {
                                     //Calculate 3x3
                                     val tx = (x + w).coerceIn(0, width - 1)
                                     val ty = (y + h).coerceIn(0, height - 1)
-                                    val pixel = pixelGrays[tx + ty]
+                                    val pixel = pixelGrays[tx + ty * width]
                                     sumLocal += pixel
                                     sumSqrLocal += pixel.toFloat().pow(2)
                                 }
@@ -325,30 +282,29 @@ class ExpressionRecognizer(
                             val mean = sumLocal / 9
                             meanLocalArr[x + y * width] = mean
                             stdLocalArr[x + y * width] =
-                                sqrt((sumSqrLocal - 2 * mean * sumLocal) / 9 + mean.pow(2))
+                                sqrt(sumSqrLocal / 9 - (sumLocal/9).pow(2))
                             mutex.withLock {
                                 sumGlobal += pixelGrays[x + y * width]
-                                sumSqrGlobal += pixelGrays[x + y * width].toFloat().pow(2)
+                                sumSqrGlobal += pixelGrays[x + y * width].toDouble().pow(2)
                             }
                         }
                     }
                 )
             }
-
             deferreds.joinAll()
         }
+        val meanGlobal = sumGlobal / (width*height)
+        val stdGlobal = sqrt(sumSqrGlobal/ (width*height) - (sumGlobal/(width*height)).pow(2))
 
-        meanGlobal = sumGlobal / (width*height)
-        val stdGlobal = sqrt((sumSqrGlobal - 2*meanGlobal*sumGlobal)/9+meanGlobal.pow(2))
-
-        //Begin Nicks Method
         val outputPixels = IntArray(width*height)
 
         for (i in pixelGrays.indices){
-            if (stdLocalArr[i] > stdGlobal && meanLocalArr[i] > meanGlobal)
+            if (stdLocalArr[i] < stdGlobal && meanLocalArr[i] > meanGlobal) {
                 pixelGrays[i] = meanGlobal.toInt()
+            }
         }
 
+        //Begin Nicks Method
         runBlocking(Dispatchers.Default) {
             val mutex = Mutex()
             val deferreds = mutableListOf<Job>()
@@ -362,8 +318,8 @@ class ExpressionRecognizer(
                             var mean = 0.0
                             var sqrs = 0.0
                             val pos = x + y * width
-                            for (h in -7 until 7) {
-                                for (w in -7 until 7) {
+                            for (h in -7..7) {
+                                for (w in -7..7) {
                                     val tx = (x + w).coerceIn(0, width - 1)
                                     val ty = (y + h).coerceIn(0, height - 1)
                                     mean += pixelGrays[tx + ty * width]
@@ -371,14 +327,14 @@ class ExpressionRecognizer(
                                         .pow(2)
                                 }
                             }
-                            sqrs /= 15 * 15
-                            mean /= 15 * 15
+                            val np = 15*15
+                            mean /= np
 
                             val threshold =
-                                mean + -0.1 * sqrt((sqrs / (15 * 15) - mean.pow(2) / (15 * 15)))
+                                mean + -0.1 * sqrt((sqrs - mean.pow(2)) / np)
                             mutex.withLock {
                                 outputPixels[pos] =
-                                    if (pixelGrays[pos] < threshold) Color.BLACK else Color.WHITE
+                                    if (pixelGrays[pos] > threshold) Color.WHITE else Color.BLACK
                             }
                         }
 
@@ -533,7 +489,7 @@ class ExpressionRecognizer(
         components.forEachIndexed { index, component ->
             Log.d(TAG, "Raw component $index: rect=${component.rect}, area=${component.area}")
             val crop = cropBitmapWithPadding(bitmap, component.rect, 8)
-            DebugImageSaver.saveBitmap(appContext, crop, "debug_component_${index}.png")
+//            DebugImageSaver.saveBitmap(appContext, crop, "debug_component_${index}.png")
         }
 
         Log.d(TAG, "Total raw components detected: ${components.size}")
@@ -656,7 +612,7 @@ class ExpressionRecognizer(
     ): List<Rect> {
         if (rects.isEmpty()) return rects
 
-        val closeGap = maxOf(6, (minOf(imageWidth, imageHeight) * 0.015f).toInt())
+        val closeGap = maxOf(6, (minOf(imageWidth, imageHeight) * 0.001f).toInt())
         var currentRects = rects.map { Rect(it) }.toMutableList()
         currentRects.forEachIndexed { i, rect -> Log.d(TAG, "Merged rect $i: $rect") }
 

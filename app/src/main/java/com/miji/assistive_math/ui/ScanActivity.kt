@@ -21,6 +21,7 @@ import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
+import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
@@ -29,7 +30,6 @@ import androidx.exifinterface.media.ExifInterface
 import com.miji.assistive_math.R
 import com.miji.assistive_math.ml.ExpressionRecognizer
 import com.miji.assistive_math.ml.RecognitionOutput
-import java.io.File
 import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -357,26 +357,18 @@ class ScanActivity : AppCompatActivity(){
         updateSpeakingCard("Hold still. Capturing equation…")
         speakText("Hold still. Capturing equation.")
 
-        val photoFile = File(cacheDir, "scan_${System.currentTimeMillis()}.jpg")
-        val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
-
         capture.takePicture(
-            outputOptions,
             ContextCompat.getMainExecutor(this),
-            object : ImageCapture.OnImageSavedCallback {
-                override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                    val uri = Uri.fromFile(photoFile)
-                    Log.d(TAG, "Photo saved: $uri")
-                    isCapturing = false
+            object : ImageCapture.OnImageCapturedCallback() {
+                override fun onCaptureSuccess(image: ImageProxy) {
                     setAutoCaptureStatus("PROCESSING…")
                     updateSpeakingCard("Processing equation…")
                     speakText("Processing equation.")
-                    processImageUri(uri)
+                    processImageFromProxy(image)
                 }
 
                 override fun onError(exception: ImageCaptureException) {
                     Log.e(TAG, "Capture failed: ${exception.message}", exception)
-                    isCapturing = false
                     setAutoCaptureStatus("AUTO-CAPTURE READY")
                     updateSpeakingCard("Capture failed. Please try again.")
                     speakText("Capture failed. Please try again.")
@@ -388,11 +380,12 @@ class ScanActivity : AppCompatActivity(){
     // ── Gallery result ─────────────────────────────────────────────────────────
 
     private fun handleGalleryImage(uri: Uri) {
+        isCapturing = true
         Log.d(TAG, "Gallery image selected: $uri")
         setAutoCaptureStatus("PROCESSING…")
         updateSpeakingCard("Processing selected image…")
         speakText("Processing selected image.")
-        processImageUri(uri)
+        processImageFromFile(uri)
     }
 
     // ── Auto-capture state ─────────────────────────────────────────────────────
@@ -403,20 +396,26 @@ class ScanActivity : AppCompatActivity(){
 
     // ── Process Image ──────────────────────────────────────────────────────────
 
-    private fun processImageUri(uri: Uri) {
+
+    private fun processImageFromProxy(image: ImageProxy){
+        processImage(image.toBitmap())
+    }
+
+    private fun processImageFromFile(uri: Uri){
+        val bitmap = loadBitmapFromUri(uri)
+        if (bitmap == null) {
+            runOnUiThread {
+                setAutoCaptureStatus("FAILED")
+                updateSpeakingCard("Could not read the image. Please try again.")
+                speakText("Could not read the image. Please try again.")
+            }
+            return
+        }
+        processImage(bitmap)
+    }
+    private fun processImage(bitmap: Bitmap) {
         cameraExecutor.execute {
             try {
-                val bitmap = loadBitmapFromUri(uri)
-
-                if (bitmap == null) {
-                    runOnUiThread {
-                        setAutoCaptureStatus("FAILED")
-                        updateSpeakingCard("Could not read the image. Please try again.")
-                        speakText("Could not read the image. Please try again.")
-                    }
-                    return@execute
-                }
-
                 val output = getExpressionRecognizer().recognizeExpression(bitmap)
 
                 Log.d(TAG, "Detected symbols: ${output.detectedSymbolCount}")
@@ -468,6 +467,7 @@ class ScanActivity : AppCompatActivity(){
                     speakText("Processing failed. Please try again.")
                 }
             }
+            isCapturing = false
         }
     }
 

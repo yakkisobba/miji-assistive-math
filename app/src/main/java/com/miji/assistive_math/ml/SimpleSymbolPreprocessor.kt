@@ -12,29 +12,17 @@ object SimpleSymbolPreprocessor {
     private const val TAG = "SimpleSymbolPreprocessor"
 
     fun bitmapToModelInput(symbolBitmap: Bitmap, img_size: Int): FloatArray {
-        val prepared = prepareToMatchTraining(symbolBitmap,img_size)
-        return bitmapToFloatArray(prepared,img_size)
+        val prepared = prepareToMatchTraining(symbolBitmap, img_size)
+        return bitmapToFloatArray(prepared, img_size)
     }
 
-    fun preprocessToDebug32(symbolBitmap: Bitmap, img_size : Int): Bitmap {
-        return prepareToMatchTraining(symbolBitmap,img_size)
+    fun preprocessToDebug32(symbolBitmap: Bitmap, img_size: Int): Bitmap {
+        return prepareToMatchTraining(symbolBitmap, img_size)
     }
 
-    /**
-     * Matches the training pipeline exactly:
-     *   Pad(4, fill=white) -> Resize(32x32, bilinear) -> Normalize(mean=0.5, std=0.5)
-     *
-     * NO binarization. NO stroke correction. NO tight crop.
-     * The model was trained on smooth grayscale images — we must match that.
-     */
-    private fun prepareToMatchTraining(bitmap: Bitmap,img_size: Int): Bitmap {
-        // Remove padding since training images are 28x28 with no padding
-        // Resize directly to 28x28 to match the training input size
+    private fun prepareToMatchTraining(bitmap: Bitmap, img_size: Int): Bitmap {
         val resized = bitmap.scale(img_size, img_size)
-
-        // Log pixel stats if needed
         logPixelStats(resized)
-
         return resized
     }
 
@@ -49,7 +37,7 @@ object SimpleSymbolPreprocessor {
                 val g = Color.green(pixel)
                 val b = Color.blue(pixel)
                 val gray = (0.299f * r + 0.587f * g + 0.114f * b) / 255f
-                input[index++] = (gray - 0.5f) / 0.5f  // Normalize to [-1, 1]
+                input[index++] = (gray - 0.5f) / 0.5f
             }
         }
         return input

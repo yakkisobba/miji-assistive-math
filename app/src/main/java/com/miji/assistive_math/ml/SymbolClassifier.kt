@@ -7,6 +7,7 @@ import org.pytorch.Module
 import org.pytorch.Tensor
 import kotlin.math.exp
 
+
 class SymbolClassifier(
     context: Context
 ) {
@@ -28,7 +29,7 @@ class SymbolClassifier(
         Log.d("SymbolClassifier", "PyTorch Mobile model loaded successfully")
     }
 
-    fun classify(inputArray: FloatArray,img_size: Long): PredictionResult {
+    fun classify(inputArray: FloatArray, img_size: Long): PredictionResult {
         val inputTensor = Tensor.fromBlob(
             inputArray,
             longArrayOf(1, 1, img_size, img_size)

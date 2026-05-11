@@ -387,6 +387,17 @@ class ScanActivity : AppCompatActivity(){
 
     private fun handleGalleryImage(uri: Uri) {
         Log.d(TAG, "Gallery image selected: $uri")
+        try {
+            // Verify the URI is readable
+            contentResolver.getType(uri)?.let { 
+                Log.d(TAG, "Image MIME type: $it")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Could not verify selected image: ${e.message}")
+        }
+        
+        // Reset capture state before processing
+        isCapturing = true
         setAutoCaptureStatus("PROCESSING…")
         updateSpeakingCard("Processing selected image…")
         speakText("Processing selected image.")
@@ -404,9 +415,11 @@ class ScanActivity : AppCompatActivity(){
     private fun processImageUri(uri: Uri) {
         cameraExecutor.execute {
             try {
+                Log.d(TAG, "Starting image processing for URI: $uri")
                 val bitmap = loadBitmapFromUri(uri)
 
                 if (bitmap == null) {
+                    Log.e(TAG, "Failed to load bitmap from URI")
                     runOnUiThread {
                         isCapturing = false
                         setAutoCaptureStatus("FAILED")
@@ -416,8 +429,11 @@ class ScanActivity : AppCompatActivity(){
                     return@execute
                 }
 
+                Log.d(TAG, "Bitmap loaded successfully: ${bitmap.width}x${bitmap.height}")
+                Log.d(TAG, "Starting expression recognition...")
                 val output = getExpressionRecognizer().recognizeExpression(bitmap)
 
+                Log.d(TAG, "Recognition completed.")
                 Log.d(TAG, "Detected symbols: ${output.detectedSymbolCount}")
                 Log.d(TAG, "Labels: ${output.labels}")
                 Log.d(TAG, "Expression: ${output.expression}")
@@ -457,11 +473,11 @@ class ScanActivity : AppCompatActivity(){
                 }
 
             } catch (e: Exception) {
-                Log.e(TAG, "Processing failed", e)
+                Log.e(TAG, "Processing failed: ${e.message}", e)
                 runOnUiThread {
                     isCapturing = false
                     setAutoCaptureStatus("FAILED")
-                    updateSpeakingCard("Processing failed. Please try again.")
+                    updateSpeakingCard("Processing failed: ${e.message}")
                     speakText("Processing failed. Please try again.")
                 }
             }
@@ -471,38 +487,63 @@ class ScanActivity : AppCompatActivity(){
     // ── Bitmap helpers ─────────────────────────────────────────────────────────
 
     private fun loadBitmapFromUri(uri: Uri): Bitmap? {
-        val bitmap = contentResolver.openInputStream(uri).use { inputStream ->
-            if (inputStream == null) null
-            else BitmapFactory.decodeStream(inputStream)
+        try {
+            // Copy the URI content to a temporary cache file for reliable access
+            val tempFile = File(cacheDir, "temp_image_${System.currentTimeMillis()}.jpg")
+            
+            contentResolver.openInputStream(uri).use { inputStream ->
+                if (inputStream == null) {
+                    Log.e(TAG, "Could not open input stream from URI: $uri")
+                    return null
+                }
+                tempFile.outputStream().use { outputStream ->
+                    inputStream.copyTo(outputStream)
+                }
+            }
+            
+            // Now decode the bitmap from the temporary file
+            val bitmap = BitmapFactory.decodeFile(tempFile.absolutePath)
+            if (bitmap == null) {
+                Log.e(TAG, "Failed to decode bitmap from temporary file")
+                tempFile.delete()
+                return null
+            }
+            
+            // Rotate if needed and clean up temp file
+            val rotatedBitmap = rotateBitmapIfRequired(tempFile, bitmap)
+            tempFile.delete()
+            
+            return rotatedBitmap
+        } catch (e: Exception) {
+            Log.e(TAG, "Error loading bitmap from URI: ${e.message}", e)
+            return null
         }
-        if (bitmap == null) return null
-        return rotateBitmapIfRequired(uri, bitmap)
     }
 
-    private fun rotateBitmapIfRequired(uri: Uri, bitmap: Bitmap): Bitmap {
-        val orientation = contentResolver.openInputStream(uri).use { inputStream ->
-            if (inputStream == null) ExifInterface.ORIENTATION_NORMAL
-            else {
-                val exif = ExifInterface(inputStream)
-                exif.getAttributeInt(
-                    ExifInterface.TAG_ORIENTATION,
-                    ExifInterface.ORIENTATION_NORMAL
-                )
+    private fun rotateBitmapIfRequired(file: File, bitmap: Bitmap): Bitmap {
+        try {
+            val exif = ExifInterface(file.absolutePath)
+            val orientation = exif.getAttributeInt(
+                ExifInterface.TAG_ORIENTATION,
+                ExifInterface.ORIENTATION_NORMAL
+            )
+
+            val rotationDegrees = when (orientation) {
+                ExifInterface.ORIENTATION_ROTATE_90  -> 90f
+                ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+                ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+                else -> 0f
             }
+
+            if (rotationDegrees == 0f) return bitmap
+
+            val matrix = Matrix()
+            matrix.postRotate(rotationDegrees)
+            return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error reading EXIF data: ${e.message}", e)
+            return bitmap // Return unrotated bitmap if EXIF reading fails
         }
-
-        val rotationDegrees = when (orientation) {
-            ExifInterface.ORIENTATION_ROTATE_90  -> 90f
-            ExifInterface.ORIENTATION_ROTATE_180 -> 180f
-            ExifInterface.ORIENTATION_ROTATE_270 -> 270f
-            else -> 0f
-        }
-
-        if (rotationDegrees == 0f) return bitmap
-
-        val matrix = Matrix()
-        matrix.postRotate(rotationDegrees)
-        return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
     }
 
     // ── Open Result Screen ─────────────────────────────────────────────────────

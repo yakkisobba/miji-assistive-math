@@ -1,5 +1,6 @@
 package com.miji.assistive_math.ml
 
+import android.content.ContentValues.TAG
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -12,9 +13,31 @@ import android.util.Log
 import java.util.ArrayDeque
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.scale
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.flow.asFlow
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.flow.transform
+import kotlinx.coroutines.flow.withIndex
+import kotlinx.coroutines.joinAll
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlin.collections.mapIndexed
+import kotlin.collections.plusAssign
+import kotlin.math.ceil
+import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.sqrt
+import kotlin.text.get
+import kotlin.text.set
+import kotlin.times
 
 class ExpressionRecognizer(
     context: Context
@@ -31,7 +54,9 @@ class ExpressionRecognizer(
             widthRatio = 0.92f,
             heightRatio = 0.68f
         )
-        scanCrop = scanCrop.scale(min(scanCrop.width,512),min(scanCrop.height,512));
+        val ratio = scanCrop.width / scanCrop.height.toFloat()
+        val maxWidth = 1280
+        scanCrop = scanCrop.scale(maxWidth,(maxWidth*(1/ratio)).toInt())
 
         Log.d(TAG, "Scan crop: width=${scanCrop.width}, height=${scanCrop.height}")
 
@@ -269,59 +294,98 @@ class ExpressionRecognizer(
         var sumGlobal = 0.0f
         var sumSqrGlobal = 0.0f
 
-        //First calculate means and std for every 3x3 window
-        for (y in 0 until height){
-            for (x in 0 until width){
-                var sumLocal = 0.0f
-                var sumSqrLocal = 0.0f
-                for(h in -1 until 1){
-                    for(w in -1 until 1){
-                        //Calculate 3x3
-                        val tx = (x + w).coerceIn(0,width-1)
-                        val ty = (y + h).coerceIn(0,height-1)
-                        val pixel = pixelGrays[tx+ty]
-                        sumLocal += pixel
-                        sumSqrLocal += pixel.toFloat().pow(2)
+
+
+        val numCoroutines = 80
+        val blockSize = (width*height / numCoroutines.toFloat()).toInt()
+
+        var meanGlobal = 0.0f
+        runBlocking(Dispatchers.Default) {
+            val mutex = Mutex()
+            val deferreds = mutableListOf<Job>()
+
+            for (i in 0 until numCoroutines){
+                deferreds.add(
+                    async {
+                        for (index in i*blockSize until (i+1)*blockSize ) {
+                            val x = index % width
+                            val y = index / width
+                            var sumLocal = 0.0f
+                            var sumSqrLocal = 0.0f
+                            for (h in -1 until 1) {
+                                for (w in -1 until 1) {
+                                    //Calculate 3x3
+                                    val tx = (x + w).coerceIn(0, width - 1)
+                                    val ty = (y + h).coerceIn(0, height - 1)
+                                    val pixel = pixelGrays[tx + ty]
+                                    sumLocal += pixel
+                                    sumSqrLocal += pixel.toFloat().pow(2)
+                                }
+                            }
+                            val mean = sumLocal / 9
+                            meanLocalArr[x + y * width] = mean
+                            stdLocalArr[x + y * width] =
+                                sqrt((sumSqrLocal - 2 * mean * sumLocal) / 9 + mean.pow(2))
+                            mutex.withLock {
+                                sumGlobal += pixelGrays[x + y * width]
+                                sumSqrGlobal += pixelGrays[x + y * width].toFloat().pow(2)
+                            }
+                        }
                     }
-                }
-                val mean = sumLocal / 9
-                meanLocalArr[x + y*width] = mean
-                stdLocalArr[x + y*width] = sqrt((sumSqrLocal - 2*mean*sumLocal)/9+mean.pow(2))
-                sumGlobal += pixelGrays[x+y*width]
-                sumSqrGlobal += pixelGrays[x+y*width].toFloat().pow(2)
+                )
             }
+
+            deferreds.joinAll()
         }
 
-        val meanGlobal = sumGlobal / width*height
+        meanGlobal = sumGlobal / (width*height)
         val stdGlobal = sqrt((sumSqrGlobal - 2*meanGlobal*sumGlobal)/9+meanGlobal.pow(2))
+
+        //Begin Nicks Method
+        val outputPixels = IntArray(width*height)
 
         for (i in pixelGrays.indices){
             if (stdLocalArr[i] > stdGlobal && meanLocalArr[i] > meanGlobal)
                 pixelGrays[i] = meanGlobal.toInt()
         }
-        val bitmapTest = createBitmap(width,height)
-        bitmapTest.setPixels(pixelGrays,0,width,0,0,width,height)
 
-        val outputPixels = IntArray(width*height)
+        runBlocking(Dispatchers.Default) {
+            val mutex = Mutex()
+            val deferreds = mutableListOf<Job>()
 
-        for (y in 0 until height){
-            for (x in 0 until width){
-                var mean = 0.0
-                var sqrs = 0.0
-                val pos = x+y*width
-                for(h in -7 until 7){
-                    for(w in -7 until 7){
-                        val tx = (x + w).coerceIn(0,width-1)
-                        val ty = (y + h).coerceIn(0,height-1)
-                        mean += pixelGrays[tx+ty*width]
-                        sqrs += pixelGrays[tx+ty*width].toFloat().pow(2)
+            for (i in 0 until numCoroutines){
+                deferreds.add(
+                    async {
+                        for (index in i * blockSize until (i + 1) * blockSize) {
+                            val x = index % width
+                            val y = index / width
+                            var mean = 0.0
+                            var sqrs = 0.0
+                            val pos = x + y * width
+                            for (h in -7 until 7) {
+                                for (w in -7 until 7) {
+                                    val tx = (x + w).coerceIn(0, width - 1)
+                                    val ty = (y + h).coerceIn(0, height - 1)
+                                    mean += pixelGrays[tx + ty * width]
+                                    sqrs += pixelGrays[tx + ty * width].toFloat()
+                                        .pow(2)
+                                }
+                            }
+                            sqrs /= 15 * 15
+                            mean /= 15 * 15
+
+                            val threshold =
+                                mean + -0.1 * sqrt((sqrs / (15 * 15) - mean.pow(2) / (15 * 15)))
+                            mutex.withLock {
+                                outputPixels[pos] =
+                                    if (pixelGrays[pos] < threshold) Color.BLACK else Color.WHITE
+                            }
+                        }
+
                     }
-                }
-                sqrs /= 15*15
-                mean /= 15*15
-                val threshold = mean + -0.2 * sqrt((sqrs - mean.pow(2))/(15*15))
-                outputPixels[pos] = if (pixelGrays[pos] < threshold) Color.BLACK else Color.WHITE
+                )
             }
+            deferreds.joinAll()
         }
 
         val output = createBitmap(width,height, Bitmap.Config.ARGB_8888)

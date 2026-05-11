@@ -1,6 +1,5 @@
 package com.miji.assistive_math.ml
 
-import android.content.ContentValues.TAG
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -9,42 +8,25 @@ import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
 import android.graphics.Rect
-import android.os.Build
 import android.util.Log
-import androidx.annotation.RequiresApi
-import java.util.ArrayDeque
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.scale
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.flow.asFlow
-import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.toList
-import kotlinx.coroutines.flow.transform
-import kotlinx.coroutines.flow.withIndex
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlin.collections.mapIndexed
-import kotlin.collections.plusAssign
+import java.util.ArrayDeque
 import kotlin.math.ceil
-import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.sqrt
-import kotlin.text.get
-import kotlin.text.set
-import kotlin.times
 
 class ExpressionRecognizer(
     context: Context
 ) {
-    private val appContext = context.applicationContext
     private val classifier = SymbolClassifier(context.applicationContext)
 
     fun recognizeExpression(bitmap: Bitmap): RecognitionOutput {
@@ -152,7 +134,7 @@ class ExpressionRecognizer(
         val canvas = Canvas(output)
         val paint = Paint()
         val colorMatrix = ColorMatrix()
-        colorMatrix.setSaturation(0.0f);
+        colorMatrix.setSaturation(0.0f)
 
         val colorFilter = ColorMatrixColorFilter(colorMatrix)
 
@@ -404,7 +386,7 @@ class ExpressionRecognizer(
         val outputPixels = IntArray(total)
         for (i in 0 until total) outputPixels[i] = if (isBlack[i]) Color.BLACK else Color.WHITE
 
-        val output = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val output = createBitmap(width, height)
         output.setPixels(outputPixels, 0, width, 0, 0, width, height)
         return output
     }
@@ -488,7 +470,7 @@ class ExpressionRecognizer(
         Log.d(TAG, "Raw useful components: ${components.size}")
         components.forEachIndexed { index, component ->
             Log.d(TAG, "Raw component $index: rect=${component.rect}, area=${component.area}")
-            val crop = cropBitmapWithPadding(bitmap, component.rect, 8)
+            cropBitmapWithPadding(bitmap, component.rect, 8)
 //            DebugImageSaver.saveBitmap(appContext, crop, "debug_component_${index}.png")
         }
 

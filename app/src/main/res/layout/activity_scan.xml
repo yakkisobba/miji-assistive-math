@@ -7,8 +7,6 @@
     Camera   : Replace the FrameLayout with id=cameraPreviewContainer with
                a androidx.camera.view.PreviewView once CameraX is integrated.
 -->
-
-
 <androidx.constraintlayout.widget.ConstraintLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -286,39 +284,4 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <!-- ══ PROCESSING OVERLAY (shown while equation is being recognized) ══ -->
-    <LinearLayout
-        android:id="@+id/processingOverlay"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="#CC0D0D0D"
-        android:orientation="vertical"
-        android:gravity="center"
-        android:clickable="true"
-        android:focusable="true"
-        android:visibility="gone"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
-
-        <ProgressBar
-            android:id="@+id/processingSpinner"
-            style="?android:attr/progressBarStyleLarge"
-            android:layout_width="64dp"
-            android:layout_height="64dp"
-            android:indeterminateTint="@color/accent" />
-
-        <TextView
-            android:id="@+id/tvProcessingLabel"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:text="Processing equation…"
-            android:textSize="14sp"
-            android:fontFamily="@font/inter_semibold"
-            android:textColor="@color/white"
-            android:letterSpacing="0.02" />
-
-    </LinearLayout>
 </androidx.constraintlayout.widget.ConstraintLayout>

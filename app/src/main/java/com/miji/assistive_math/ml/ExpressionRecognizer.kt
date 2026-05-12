@@ -39,7 +39,7 @@ class ExpressionRecognizer(
             heightRatio = 0.64f
         )
         val ratio = scanCrop.width / scanCrop.height.toFloat()
-        val maxWidth = 480
+        val maxWidth = 640
         scanCrop = scanCrop.scale(maxWidth,(maxWidth*(1/ratio)).toInt())
 
         Log.d(TAG, "Scan crop: width=${scanCrop.width}, height=${scanCrop.height}")

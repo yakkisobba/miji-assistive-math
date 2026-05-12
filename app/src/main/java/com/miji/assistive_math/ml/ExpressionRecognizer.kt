@@ -35,11 +35,11 @@ class ExpressionRecognizer(
         // Crop the center area where the equation should be.
         var scanCrop = cropCenterArea(
             bitmap = bitmap,
-            widthRatio = 0.92f,
-            heightRatio = 0.68f
+            widthRatio = 0.931f,
+            heightRatio = 0.7f
         )
         val ratio = scanCrop.width / scanCrop.height.toFloat()
-        val maxWidth = 960
+        val maxWidth = 720
         scanCrop = scanCrop.scale(maxWidth,(maxWidth*(1/ratio)).toInt())
 
         Log.d(TAG, "Scan crop: width=${scanCrop.width}, height=${scanCrop.height}")
@@ -340,55 +340,7 @@ class ExpressionRecognizer(
                             mean /= np
 
                             val threshold =
-                                 -0.2 * sqrt((sqrs - mean.pow(2)) / np) + mean
-                            mutex.withLock {
-                                outputPixels[pos] =
-                                    if (pixelGrays[pos] > threshold) Color.WHITE else Color.BLACK
-                            }
-                        }
-
-                    }
-                )
-            }
-            deferreds.joinAll()
-        }
-        return outputPixels
-    }
-
-    private fun sauvolaMethod(numCoroutines : Int,width : Int,height: Int, pixelGrays: IntArray): IntArray {
-        val outputPixels = IntArray(width*height)
-        val blockSize = ceil(width*height / numCoroutines.toFloat()).toInt()
-        //Begin Nicks Method
-        runBlocking(Dispatchers.Default) {
-            val mutex = Mutex()
-            val deferreds = mutableListOf<Job>()
-
-            val windowSize = 15
-            val kernelNum = windowSize/2
-            for (i in 0 until numCoroutines){
-                deferreds.add(
-                    async {
-                        for (index in i * blockSize until (i + 1) * blockSize) {
-                            val x = index % width
-                            val y = index / width
-                            var sqrs = 0.0
-                            var sum = 0.0
-                            val pos = x + y * width
-                            for (h in -kernelNum ..kernelNum) {
-                                for (w in -kernelNum..kernelNum) {
-                                    val tx = (x + w).coerceIn(0, width - 1)
-                                    val ty = (y + h).coerceIn(0, height - 1)
-                                    val pixel = pixelGrays[tx + ty * width]
-                                    sum += pixel
-                                    sqrs += pixel.toDouble().pow(2)
-                                }
-                            }
-
-                            val np = windowSize*windowSize
-                            val mean = sum / np
-                            val stddev = sqrt(sqrs / np - (sum/np).pow(2))
-                            val threshold =
-                                mean * (1-0.5*(1-stddev/128))
+                                 -0.1 * sqrt((sqrs - mean.pow(2)) / np) + mean
                             mutex.withLock {
                                 outputPixels[pos] =
                                     if (pixelGrays[pos] > threshold) Color.WHITE else Color.BLACK
@@ -465,7 +417,7 @@ class ExpressionRecognizer(
         }
 
         val output = createBitmap(width,height, Bitmap.Config.ARGB_8888)
-        output.setPixels(otsuMethod(numCoroutines,width,height,pixelGrays), 0, width, 0, 0, width, height)
+        output.setPixels(nicksMethod(numCoroutines,width,height,pixelGrays), 0, width, 0, 0, width, height)
 
         return output
     }

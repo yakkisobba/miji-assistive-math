@@ -39,18 +39,13 @@ class ExpressionRecognizer(
             heightRatio = 0.68f
         )
         val ratio = scanCrop.width / scanCrop.height.toFloat()
-        val maxWidth = 720
+        val maxWidth = 960
         scanCrop = scanCrop.scale(maxWidth,(maxWidth*(1/ratio)).toInt())
 
         Log.d(TAG, "Scan crop: width=${scanCrop.width}, height=${scanCrop.height}")
 
-        // --- GRAYSCALE copy (used for feeding the model) ---
-        // The model was trained on smooth grayscale images, NOT binary black/white.
-        // We keep this separate so symbol crops sent to the classifier stay grayscale.
-        val grayscaleCrop = toGrayscale(scanCrop)
-
         // --- BINARY copy (used only for segmentation) ---
-        val binary = makeBlackOnWhite(grayscaleCrop)
+        val binary = makeBlackOnWhite(toGrayscale(scanCrop))
         val cleanedBinary = removeBorderConnectedInk(binary)
 //        DebugImageSaver.saveBitmap(appContext, binary, "debug_binary_before_cleanup.png")
 //        DebugImageSaver.saveBitmap(appContext, cleanedBinary, "debug_binary_after_cleanup.png")
@@ -221,6 +216,192 @@ class ExpressionRecognizer(
 
     // ── Binarization ───────────────────────────────────────────────────────────
 
+
+    private fun otsuMethod(numCoroutines: Int,width : Int,height : Int, pixelGrays: IntArray): IntArray {
+        //Regular otsu method
+        val histogram = IntArray(256)
+        val blockSize = ceil(width*height / numCoroutines.toFloat()).toInt()
+        runBlocking(Dispatchers.Default) {
+            val mutex = Mutex()
+            val deferreds = mutableListOf<Job>()
+
+            val windowSize = 15
+            val kernelNum = windowSize/2
+            for (i in 0 until numCoroutines){
+                deferreds.add(
+                    async {
+                        for (index in i * blockSize until (i + 1) * blockSize) {
+                            val x = index % width
+                            val y = index / width
+                            val pos = x + y * width
+                            mutex.withLock {
+                                histogram[pixelGrays[pos]]++
+                            }
+                        }
+
+                    }
+                )
+            }
+            deferreds.joinAll()
+        }
+
+        val total = pixelGrays.size
+        var totalSum = 0L
+        for (i in 0..255) totalSum += i.toLong() * histogram[i].toLong()
+
+        var backgroundSum = 0L
+        var backgroundWeight = 0
+        var maxVariance = 0.0
+        var threshold = 128
+
+        for (i in 0..255) {
+            backgroundWeight += histogram[i]
+            if (backgroundWeight == 0) continue
+
+            val foregroundWeight = total - backgroundWeight
+            if (foregroundWeight == 0) break
+
+            backgroundSum += i.toLong() * histogram[i].toLong()
+
+            val backgroundMean = backgroundSum.toDouble() / backgroundWeight.toDouble()
+            val foregroundMean =
+                (totalSum - backgroundSum).toDouble() / foregroundWeight.toDouble()
+
+            val betweenClassVariance =
+                backgroundWeight.toDouble() *
+                        foregroundWeight.toDouble() *
+                        (backgroundMean - foregroundMean) *
+                        (backgroundMean - foregroundMean)
+
+            if (betweenClassVariance > maxVariance) {
+                maxVariance = betweenClassVariance
+                threshold = i
+            }
+        }
+
+        val outputPixels = IntArray(total)
+
+        runBlocking(Dispatchers.Default) {
+            val mutex = Mutex()
+            val deferreds = mutableListOf<Job>()
+
+            val windowSize = 15
+            val kernelNum = windowSize/2
+            for (i in 0 until numCoroutines){
+                deferreds.add(
+                    async {
+                        for (index in i * blockSize until (i + 1) * blockSize) {
+                            val x = index % width
+                            val y = index / width
+                            val pos = x + y * width
+                            outputPixels[pos] =
+                                if (pixelGrays[pos] > threshold) Color.WHITE else Color.BLACK
+                        }
+
+                    }
+                )
+            }
+            deferreds.joinAll()
+        }
+
+        return outputPixels
+    }
+
+    private fun nicksMethod(numCoroutines : Int,width : Int,height: Int, pixelGrays: IntArray): IntArray {
+        val outputPixels = IntArray(width*height)
+        val blockSize = ceil(width*height / numCoroutines.toFloat()).toInt()
+        //Begin Nicks Method
+        runBlocking(Dispatchers.Default) {
+            val mutex = Mutex()
+            val deferreds = mutableListOf<Job>()
+
+            val windowSize = 15
+            val kernelNum = windowSize/2
+            for (i in 0 until numCoroutines){
+                deferreds.add(
+                    async {
+                        for (index in i * blockSize until (i + 1) * blockSize) {
+                            val x = index % width
+                            val y = index / width
+                            var mean = 0.0
+                            var sqrs = 0.0
+                            val pos = x + y * width
+                            for (h in -kernelNum ..kernelNum) {
+                                for (w in -kernelNum..kernelNum) {
+                                    val tx = (x + w).coerceIn(0, width - 1)
+                                    val ty = (y + h).coerceIn(0, height - 1)
+                                    val pixel = pixelGrays[tx + ty * width]
+                                    mean += pixel
+                                    sqrs += pixel.toDouble().pow(2)
+                                }
+                            }
+
+                            val np = windowSize*windowSize
+                            mean /= np
+
+                            val threshold =
+                                 -0.2 * sqrt((sqrs - mean.pow(2)) / np) + mean
+                            mutex.withLock {
+                                outputPixels[pos] =
+                                    if (pixelGrays[pos] > threshold) Color.WHITE else Color.BLACK
+                            }
+                        }
+
+                    }
+                )
+            }
+            deferreds.joinAll()
+        }
+        return outputPixels
+    }
+
+    private fun sauvolaMethod(numCoroutines : Int,width : Int,height: Int, pixelGrays: IntArray): IntArray {
+        val outputPixels = IntArray(width*height)
+        val blockSize = ceil(width*height / numCoroutines.toFloat()).toInt()
+        //Begin Nicks Method
+        runBlocking(Dispatchers.Default) {
+            val mutex = Mutex()
+            val deferreds = mutableListOf<Job>()
+
+            val windowSize = 15
+            val kernelNum = windowSize/2
+            for (i in 0 until numCoroutines){
+                deferreds.add(
+                    async {
+                        for (index in i * blockSize until (i + 1) * blockSize) {
+                            val x = index % width
+                            val y = index / width
+                            var sqrs = 0.0
+                            var sum = 0.0
+                            val pos = x + y * width
+                            for (h in -kernelNum ..kernelNum) {
+                                for (w in -kernelNum..kernelNum) {
+                                    val tx = (x + w).coerceIn(0, width - 1)
+                                    val ty = (y + h).coerceIn(0, height - 1)
+                                    val pixel = pixelGrays[tx + ty * width]
+                                    sum += pixel
+                                    sqrs += pixel.toDouble().pow(2)
+                                }
+                            }
+
+                            val np = windowSize*windowSize
+                            val mean = sum / np
+                            val stddev = sqrt(sqrs / np - (sum/np).pow(2))
+                            val threshold =
+                                mean * (1-0.5*(1-stddev/128))
+                            mutex.withLock {
+                                outputPixels[pos] =
+                                    if (pixelGrays[pos] > threshold) Color.WHITE else Color.BLACK
+                            }
+                        }
+
+                    }
+                )
+            }
+            deferreds.joinAll()
+        }
+        return outputPixels
+    }
     private fun makeBlackOnWhite(grayscale: Bitmap): Bitmap {
         val width = grayscale.width
         val height = grayscale.height
@@ -229,7 +410,7 @@ class ExpressionRecognizer(
         grayscale.getPixels(pixels, 0, width, 0, 0, width, height)
         val pixelGrays = pixels.map { Color.red(it) }.toIntArray()
 
-        //DSCE + Nicks Method based on Mustafa et al. (https://doi.org/10.32604/cmc.2022.019801)
+        //DSCE + Otsu Method based on Mustafa et al. (https://doi.org/10.32604/cmc.2022.019801)
         val meanLocalArr = DoubleArray(width * height)
         val stdLocalArr = DoubleArray(width * height)
         var sumGlobal = 0.0
@@ -237,7 +418,6 @@ class ExpressionRecognizer(
 
         val numCoroutines = 40
         val blockSize = ceil(width*height / numCoroutines.toFloat()).toInt()
-
 
         runBlocking(Dispatchers.Default) {
             val mutex = Mutex()
@@ -278,56 +458,14 @@ class ExpressionRecognizer(
         val meanGlobal = sumGlobal / (width*height)
         val stdGlobal = sqrt(sumSqrGlobal/ (width*height) - (sumGlobal/(width*height)).pow(2))
 
-        val outputPixels = IntArray(width*height)
-
         for (i in pixelGrays.indices){
             if (stdLocalArr[i] < stdGlobal && meanLocalArr[i] > meanGlobal) {
                 pixelGrays[i] = meanGlobal.toInt()
             }
         }
 
-        //Begin Nicks Method
-        runBlocking(Dispatchers.Default) {
-            val mutex = Mutex()
-            val deferreds = mutableListOf<Job>()
-
-            for (i in 0 until numCoroutines){
-                deferreds.add(
-                    async {
-                        for (index in i * blockSize until (i + 1) * blockSize) {
-                            val x = index % width
-                            val y = index / width
-                            var mean = 0.0
-                            var sqrs = 0.0
-                            val pos = x + y * width
-                            for (h in -7..7) {
-                                for (w in -7..7) {
-                                    val tx = (x + w).coerceIn(0, width - 1)
-                                    val ty = (y + h).coerceIn(0, height - 1)
-                                    mean += pixelGrays[tx + ty * width]
-                                    sqrs += pixelGrays[tx + ty * width].toFloat()
-                                        .pow(2)
-                                }
-                            }
-                            val np = 15*15
-                            mean /= np
-
-                            val threshold =
-                                mean + -0.1 * sqrt((sqrs - mean.pow(2)) / np)
-                            mutex.withLock {
-                                outputPixels[pos] =
-                                    if (pixelGrays[pos] > threshold) Color.WHITE else Color.BLACK
-                            }
-                        }
-
-                    }
-                )
-            }
-            deferreds.joinAll()
-        }
-
         val output = createBitmap(width,height, Bitmap.Config.ARGB_8888)
-        output.setPixels(outputPixels, 0, width, 0, 0, width, height)
+        output.setPixels(otsuMethod(numCoroutines,width,height,pixelGrays), 0, width, 0, 0, width, height)
 
         return output
     }
@@ -470,7 +608,7 @@ class ExpressionRecognizer(
         Log.d(TAG, "Raw useful components: ${components.size}")
         components.forEachIndexed { index, component ->
             Log.d(TAG, "Raw component $index: rect=${component.rect}, area=${component.area}")
-            cropBitmapWithPadding(bitmap, component.rect, 8)
+            cropBitmapWithPadding(bitmap, component.rect, 4)
 //            DebugImageSaver.saveBitmap(appContext, crop, "debug_component_${index}.png")
         }
 
@@ -594,7 +732,7 @@ class ExpressionRecognizer(
     ): List<Rect> {
         if (rects.isEmpty()) return rects
 
-        val closeGap = maxOf(6, (minOf(imageWidth, imageHeight) * 0.001f).toInt())
+        val closeGap = maxOf(3, (minOf(imageWidth, imageHeight) * 0.01f).toInt())
         var currentRects = rects.map { Rect(it) }.toMutableList()
         currentRects.forEachIndexed { i, rect -> Log.d(TAG, "Merged rect $i: $rect") }
 

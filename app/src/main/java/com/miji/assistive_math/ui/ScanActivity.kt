@@ -30,6 +30,7 @@ import androidx.exifinterface.media.ExifInterface
 import com.miji.assistive_math.R
 import com.miji.assistive_math.ml.ExpressionRecognizer
 import com.miji.assistive_math.ml.RecognitionOutput
+import java.io.File
 import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors

@@ -140,7 +140,7 @@ class ExpressionRecognizer(
         }
 
         val labels = predictions.map { it.label }
-        val expression = buildExpression(labels)
+        val expression = buildExpression(labels, symbolRects)
 
         Log.d(TAG, "Final labels: $labels")
         Log.d(TAG, "Final expression: $expression")
@@ -745,17 +745,44 @@ class ExpressionRecognizer(
 
     // ── Expression building ────────────────────────────────────────────────────
 
-    private fun buildExpression(labels: List<String>): String {
-        return labels.joinToString("") { labelToToken(it) }
+    private fun buildExpression(labels: List<String>, symbolRects: List<Rect>): String {
+        return labels.mapIndexed { index, label ->
+            val rect = if (index < symbolRects.size) symbolRects[index] else null
+            labelToToken(label, rect)
+        }.joinToString("")
     }
 
-    private fun labelToToken(label: String): String = when (label) {
+    private fun labelToToken(label: String, rect: Rect?): String = when (label) {
         "plus" -> "+"
         "minus" -> "-"
         "x" -> "*"
         "slash" -> "/"
-        "dot" -> "."
+        "dot" -> {
+            // Check if this dot is actually a minus sign based on its dimensions
+            if (rect != null && isDotActuallyMinus(rect)) {
+                "-"
+            } else {
+                "."
+            }
+        }
         else -> label
+    }
+
+    /**
+     * Determines if a dot symbol is actually a minus sign by analyzing its aspect ratio.
+     * Minus signs are typically wider than they are tall, while dots are more circular.
+     */
+    private fun isDotActuallyMinus(rect: Rect): Boolean {
+        val width = rect.width()
+        val height = rect.height()
+        
+        if (height == 0) return false
+        
+        val aspectRatio = width.toFloat() / height.toFloat()
+        
+        // If width is significantly larger than height (aspect ratio > 2.0),
+        // it's likely a minus sign. A dot should have aspect ratio close to 1.0
+        return aspectRatio > 2.0f
     }
 
     // ── Data classes ───────────────────────────────────────────────────────────

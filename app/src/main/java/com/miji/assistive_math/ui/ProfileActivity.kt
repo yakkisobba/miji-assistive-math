@@ -123,7 +123,7 @@ class ProfileActivity : AppCompatActivity() {
         val nav = findViewById<View>(R.id.bottomNavProfile)
         BottomNavHelper.bind(
             navRoot   = nav,
-            activeTab = BottomNavHelper.Tab.PROFILE,
+            activeTab = Tab.PROFILE,
             onHome    = { startActivity(Intent(this, HomeActivity::class.java)) },
             onScan    = { startActivity(Intent(this, ScanActivity::class.java)) },
             onProfile = { /* already here */ }

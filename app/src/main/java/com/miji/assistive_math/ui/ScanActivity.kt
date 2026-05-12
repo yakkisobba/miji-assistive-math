@@ -21,6 +21,7 @@ import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
+import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
@@ -29,7 +30,6 @@ import androidx.exifinterface.media.ExifInterface
 import com.miji.assistive_math.R
 import com.miji.assistive_math.ml.ExpressionRecognizer
 import com.miji.assistive_math.ml.RecognitionOutput
-import java.io.File
 import java.util.Locale
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -357,24 +357,18 @@ class ScanActivity : AppCompatActivity(){
         updateSpeakingCard("Hold still. Capturing equation…")
         speakText("Hold still. Capturing equation.")
 
-        val photoFile = File(cacheDir, "scan_${System.currentTimeMillis()}.jpg")
-        val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
-
         capture.takePicture(
-            outputOptions,
             ContextCompat.getMainExecutor(this),
-            object : ImageCapture.OnImageSavedCallback {
-                override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                    val uri = Uri.fromFile(photoFile)
+            object : ImageCapture.OnImageCapturedCallback() {
+                override fun onCaptureSuccess(image: ImageProxy) {
                     setAutoCaptureStatus("PROCESSING…")
                     updateSpeakingCard("Processing equation…")
                     speakText("Processing equation.")
-                    processImageUri(uri)
+                    processImageFromProxy(image)
                 }
 
                 override fun onError(exception: ImageCaptureException) {
                     Log.e(TAG, "Capture failed: ${exception.message}", exception)
-                    isCapturing = false
                     setAutoCaptureStatus("AUTO-CAPTURE READY")
                     updateSpeakingCard("Capture failed. Please try again.")
                     speakText("Capture failed. Please try again.")
@@ -386,22 +380,23 @@ class ScanActivity : AppCompatActivity(){
     // ── Gallery result ─────────────────────────────────────────────────────────
 
     private fun handleGalleryImage(uri: Uri) {
+        isCapturing = true
         Log.d(TAG, "Gallery image selected: $uri")
         try {
             // Verify the URI is readable
-            contentResolver.getType(uri)?.let { 
+            contentResolver.getType(uri)?.let {
                 Log.d(TAG, "Image MIME type: $it")
             }
         } catch (e: Exception) {
             Log.e(TAG, "Could not verify selected image: ${e.message}")
         }
-        
+
         // Reset capture state before processing
         isCapturing = true
         setAutoCaptureStatus("PROCESSING…")
         updateSpeakingCard("Processing selected image…")
         speakText("Processing selected image.")
-        processImageUri(uri)
+        processImageFromFile(uri)
     }
 
     // ── Auto-capture state ─────────────────────────────────────────────────────
@@ -412,25 +407,26 @@ class ScanActivity : AppCompatActivity(){
 
     // ── Process Image ──────────────────────────────────────────────────────────
 
-    private fun processImageUri(uri: Uri) {
+
+    private fun processImageFromProxy(image: ImageProxy){
+        processImage(image.toBitmap())
+    }
+
+    private fun processImageFromFile(uri: Uri){
+        val bitmap = loadBitmapFromUri(uri)
+        if (bitmap == null) {
+            runOnUiThread {
+                setAutoCaptureStatus("FAILED")
+                updateSpeakingCard("Could not read the image. Please try again.")
+                speakText("Could not read the image. Please try again.")
+            }
+            return
+        }
+        processImage(bitmap)
+    }
+    private fun processImage(bitmap: Bitmap) {
         cameraExecutor.execute {
             try {
-                Log.d(TAG, "Starting image processing for URI: $uri")
-                val bitmap = loadBitmapFromUri(uri)
-
-                if (bitmap == null) {
-                    Log.e(TAG, "Failed to load bitmap from URI")
-                    runOnUiThread {
-                        isCapturing = false
-                        setAutoCaptureStatus("FAILED")
-                        updateSpeakingCard("Could not read the image. Please try again.")
-                        speakText("Could not read the image. Please try again.")
-                    }
-                    return@execute
-                }
-
-                Log.d(TAG, "Bitmap loaded successfully: ${bitmap.width}x${bitmap.height}")
-                Log.d(TAG, "Starting expression recognition...")
                 val output = getExpressionRecognizer().recognizeExpression(bitmap)
 
                 Log.d(TAG, "Recognition completed.")
@@ -481,6 +477,7 @@ class ScanActivity : AppCompatActivity(){
                     speakText("Processing failed. Please try again.")
                 }
             }
+            isCapturing = false
         }
     }
 
@@ -490,7 +487,7 @@ class ScanActivity : AppCompatActivity(){
         try {
             // Copy the URI content to a temporary cache file for reliable access
             val tempFile = File(cacheDir, "temp_image_${System.currentTimeMillis()}.jpg")
-            
+
             contentResolver.openInputStream(uri).use { inputStream ->
                 if (inputStream == null) {
                     Log.e(TAG, "Could not open input stream from URI: $uri")
@@ -500,7 +497,7 @@ class ScanActivity : AppCompatActivity(){
                     inputStream.copyTo(outputStream)
                 }
             }
-            
+
             // Now decode the bitmap from the temporary file
             val bitmap = BitmapFactory.decodeFile(tempFile.absolutePath)
             if (bitmap == null) {
@@ -508,11 +505,11 @@ class ScanActivity : AppCompatActivity(){
                 tempFile.delete()
                 return null
             }
-            
+
             // Rotate if needed and clean up temp file
             val rotatedBitmap = rotateBitmapIfRequired(tempFile, bitmap)
             tempFile.delete()
-            
+
             return rotatedBitmap
         } catch (e: Exception) {
             Log.e(TAG, "Error loading bitmap from URI: ${e.message}", e)

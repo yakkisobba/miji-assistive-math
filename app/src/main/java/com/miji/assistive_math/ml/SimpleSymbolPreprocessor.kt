@@ -33,7 +33,7 @@ object SimpleSymbolPreprocessor {
         val resized = bitmap.scale(img_size, img_size)
 
         // Log pixel stats if needed
-        logPixelStats(resized)
+//        logPixelStats(resized)
 
         return resized
     }

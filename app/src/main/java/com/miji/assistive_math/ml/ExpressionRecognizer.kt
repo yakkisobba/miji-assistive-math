@@ -35,11 +35,11 @@ class ExpressionRecognizer(
         // Crop the center area where the equation should be.
         var scanCrop = cropCenterArea(
             bitmap = bitmap,
-            widthRatio = 0.931f,
-            heightRatio = 0.7f
+            widthRatio = 0.92f,
+            heightRatio = 0.64f
         )
         val ratio = scanCrop.width / scanCrop.height.toFloat()
-        val maxWidth = 720
+        val maxWidth = 480
         scanCrop = scanCrop.scale(maxWidth,(maxWidth*(1/ratio)).toInt())
 
         Log.d(TAG, "Scan crop: width=${scanCrop.width}, height=${scanCrop.height}")
@@ -83,7 +83,7 @@ class ExpressionRecognizer(
             val symbolBitmapBW = cropBitmapWithPadding(
                 bitmap = expressionBinary,
                 rect = rect,
-                padding = 14
+                padding = 4
             )
 
             val inputArray = SimpleSymbolPreprocessor.bitmapToModelInput(symbolBitmapBW,48)
@@ -315,7 +315,7 @@ class ExpressionRecognizer(
             val mutex = Mutex()
             val deferreds = mutableListOf<Job>()
 
-            val windowSize = 15
+            val windowSize = 19
             val kernelNum = windowSize/2
             for (i in 0 until numCoroutines){
                 deferreds.add(
@@ -560,7 +560,7 @@ class ExpressionRecognizer(
         Log.d(TAG, "Raw useful components: ${components.size}")
         components.forEachIndexed { index, component ->
             Log.d(TAG, "Raw component $index: rect=${component.rect}, area=${component.area}")
-            cropBitmapWithPadding(bitmap, component.rect, 4)
+            cropBitmapWithPadding(bitmap, component.rect, 2)
 //            DebugImageSaver.saveBitmap(appContext, crop, "debug_component_${index}.png")
         }
 
@@ -684,7 +684,7 @@ class ExpressionRecognizer(
     ): List<Rect> {
         if (rects.isEmpty()) return rects
 
-        val closeGap = maxOf(3, (minOf(imageWidth, imageHeight) * 0.01f).toInt())
+        val closeGap = maxOf(2, (minOf(imageWidth, imageHeight) * 0.004f).toInt())
         var currentRects = rects.map { Rect(it) }.toMutableList()
         currentRects.forEachIndexed { i, rect -> Log.d(TAG, "Merged rect $i: $rect") }
 

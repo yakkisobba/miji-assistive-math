@@ -20,6 +20,7 @@ import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCapture
+import androidx.camera.core.ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
@@ -136,7 +137,9 @@ class ScanActivity : AppCompatActivity() {
                 it.setSurfaceProvider(previewView.surfaceProvider)
             }
 
-            imageCapture = ImageCapture.Builder().build()
+            imageCapture = ImageCapture.Builder()
+                .setCaptureMode(CAPTURE_MODE_MAXIMIZE_QUALITY)
+                .build()
 
             val imageAnalyzer = ImageAnalysis.Builder()
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
@@ -369,7 +372,7 @@ class ScanActivity : AppCompatActivity() {
                             speakText("Equation unclear. Move closer and try again.")
                         }
                         else -> {
-
+                            isCapturing = false
                             hideLoadingOverlay()
                             setAutoCaptureStatus("DONE")
                             updateSpeakingCard("Equation recognized.")
@@ -423,7 +426,7 @@ class ScanActivity : AppCompatActivity() {
             )
         }
         val degrees = when (orientation) {
-            ExifInterface.ORIENTATION_ROTATE_90  -> 90f
+            ExifInterface.ORIENTATION_ROTATE_90 -> 90f
             ExifInterface.ORIENTATION_ROTATE_180 -> 180f
             ExifInterface.ORIENTATION_ROTATE_270 -> 270f
             else -> 0f
@@ -437,7 +440,7 @@ class ScanActivity : AppCompatActivity() {
 
     private fun openResultScreen(output: RecognitionOutput) {
         val confidence = output.predictions.map { it.confidence }.average().toFloat() * 100f
-        val display    = output.expression
+        val display = output.expression
             .replace("*", " × ").replace("/", " ÷ ")
             .replace("+", " + ").replace("-", " - ").trim()
         val phonetic   = buildPhonetic(output.expression)
